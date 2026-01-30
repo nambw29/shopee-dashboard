@@ -46,22 +46,24 @@ def load_data(file):
                      df[col] = df[col].astype(str).str.replace(',', '').str.replace('₫', '').replace('nan', '0')
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
 
-        # PHÂN LOẠI NGUỒN ĐƠN (Sửa đổi theo yêu cầu Social và Không xác định)
+        # PHÂN LOẠI NGUỒN ĐƠN THEO LOGIC "NGƯỜI GIỚI THIỆU" CỦA SHOPEE
         def classify_source(row):
             kenh = str(row.get('Kênh', '')).lower().strip()
-            # Kiểm tra tất cả các cột SubID
-            sub_ids = f"{row['Sub_id1']} {row['Sub_id2']} {row['Sub_id3']} {row['Sub_id4']} {row['Sub_id5']}".lower().replace('nan', '').strip()
+            # Lấy thông tin từ cột "Loại thuộc tính" - Đây là nơi Shopee ghi nhận nguồn gốc
+            loai_thuoc_tinh = str(row.get('Loại thuộc tính', '')).lower().strip()
             
-            # 1. Ưu tiên Kênh hệ thống Shopee
+            # 1. Ưu tiên Kênh Video/Live của Shopee
             if 'video' in kenh: return 'Shopee Video'
             if 'live' in kenh or 'livestream' in kenh: return 'Shopee Live'
             
-            # 2. Phân loại Social: Có dữ liệu trong SubID
-            if len(sub_ids) > 0:
+            # 2. Logic Social vs Không xác định theo "Loại thuộc tính"
+            # Thường Shopee để: "Người giới thiệu" (Social) hoặc "Không xác định" (Others)
+            if 'người giới thiệu' in loai_thuoc_tinh or 'social' in loai_thuoc_tinh:
                 return 'Social'
+            elif 'không xác định' in loai_thuoc_tinh or loai_thuoc_tinh == '' or loai_thuoc_tinh == 'nan':
+                return 'Không xác định'
             
-            # 3. Còn lại là Không xác định (Others)
-            return 'Không xác định'
+            return 'Khác'
             
         df['Phân loại nguồn'] = df.apply(classify_source, axis=1)
         return df
@@ -134,45 +136,10 @@ if uploaded_file is not None:
             fig1.update_traces(hovertemplate="Ngày: %{customdata}<br>Hoa hồng: %{y:,.0f} ₫".replace(',', '.'), customdata=daily_comm['Ngày_str'])
             st.plotly_chart(fig1, use_container_width=True)
             
-            # Tỷ trọng theo nguồn: Social vs Shopee Channels vs Không xác định
             fig2 = px.pie(df_filtered, names='Phân loại nguồn', title="Tỷ trọng đơn hàng theo kênh")
             st.plotly_chart(fig2, use_container_width=True)
 
         with col_b:
             hourly_comm = df_filtered.groupby('Giờ')['Tổng hoa hồng đơn hàng(₫)'].sum().reset_index()
             fig3 = px.bar(hourly_comm, x='Giờ', y='Tổng hoa hồng đơn hàng(₫)', title="Hoa hồng theo khung giờ")
-            fig3.update_traces(hovertemplate="Giờ: %{x}h<br>Hoa hồng: %{y:,.0f} ₫".replace(',', '.'))
-            st.plotly_chart(fig3, use_container_width=True)
-            
-            cat_data = df_filtered.groupby('L1 Danh mục toàn cầu').agg(
-                Số_đơn=('ID đơn hàng', 'count'),
-                Hoa_hồng=('Tổng hoa hồng đơn hàng(₫)', 'sum')
-            ).nlargest(10, 'Hoa_hồng').reset_index()
-            
-            fig4 = px.bar(cat_data, x='Hoa_hồng', y='L1 Danh mục toàn cầu', orientation='h', title="Top 10 Danh mục")
-            fig4.update_traces(hovertemplate="Danh mục: %{y}<br>Số đơn: %{customdata[0]:,}<br>Hoa hồng: %{x:,.0f} ₫".replace(',', '.'), 
-                               customdata=cat_data[['Số_đơn']])
-            st.plotly_chart(fig4, use_container_width=True)
-
-        st.markdown("---")
-        # 4. TOP 20 SUBID
-        st.header("4. Top 20 SubID hiệu quả nhất")
-        sub_id_cols = ['Sub_id1', 'Sub_id2', 'Sub_id3', 'Sub_id4', 'Sub_id5']
-        sub_list = []
-        for col in sub_id_cols:
-            if col in df_filtered.columns:
-                temp = df_filtered[df_filtered[col].notna() & (df_filtered[col] != '')][[col, 'Tổng hoa hồng đơn hàng(₫)']]
-                temp.columns = ['SubID', 'HoaHồng']
-                sub_list.append(temp)
-        
-        if sub_list:
-            all_subs = pd.concat(sub_list).groupby('SubID').agg(Số_đơn=('SubID','count'), Hoa_hồng=('HoaHồng','sum')).reset_index().sort_values('Số_đơn', ascending=False).head(20)
-            all_subs.insert(0, 'STT', range(1, len(all_subs) + 1))
-            display_df = all_subs.copy()
-            display_df['Hoa_hồng'] = display_df['Hoa_hồng'].apply(lambda x: f"{int(round(x, 0)):,}".replace(',', '.') + " ₫")
-            display_df['Số_đơn'] = display_df['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.'))
-            st.dataframe(display_df, use_container_width=True, hide_index=True)
-
-        st.markdown("---")
-        st.header("5. Chi Tiết Đơn Hàng")
-        st.dataframe(df_filtered, use_container_width=True)
+            fig3.update_traces(ho
