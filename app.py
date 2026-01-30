@@ -2,192 +2,180 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# =============================
-# 1. CẤU HÌNH TRANG
-# =============================
-st.set_page_config(
-    page_title="Shopee Affiliate Analytics Dashboard by BLACKWHITE29",
-    layout="wide",
-    page_icon="🧧"
-)
+st.set_page_config(page_title="Shopee Affiliate Dashboard", layout="wide")
 
-# =============================
-# CSS VIỆT HÓA FILE UPLOADER
-# =============================
-st.markdown("""
-<style>
-[data-testid="stFileUploaderDropzoneInstructions"] > div > span {display:none;}
-[data-testid="stFileUploaderDropzoneInstructions"] > div::before {
-    content:"Kéo và thả tệp vào đây";
-    font-size:1.2em;
-    font-weight:bold;
-}
-[data-testid="stFileUploaderDropzoneInstructions"] > div::after {
-    content:"Hỗ trợ tệp .CSV";
-    font-size:0.8em;
-}
-.stFileUploader section button {display:none !important;}
-</style>
-""", unsafe_allow_html=True)
+# =========================
+# HÀM FORMAT TIỀN VIỆT
+# =========================
+def format_vnd(x):
+    if pd.isna(x):
+        return "0 ₫"
+    return f"{x:,.0f}".replace(",", ".") + " ₫"
 
-# =============================
-# 2. LOAD & XỬ LÝ DỮ LIỆU
-# =============================
+
+# =========================
+# LOAD DATA (VÍ DỤ)
+# 👉 THAY BẰNG FILE CỦA BẠN
+# =========================
 @st.cache_data
-def load_data(file):
-    df = pd.read_csv(file)
-
-    df['Thời Gian Đặt Hàng'] = pd.to_datetime(df['Thời Gian Đặt Hàng'])
-    df['Ngày'] = df['Thời Gian Đặt Hàng'].dt.date
-    df['Giờ'] = df['Thời Gian Đặt Hàng'].dt.hour
-
-    money_cols = [
-        'Giá trị đơn hàng (₫)',
-        'Tổng hoa hồng đơn hàng(₫)',
-        'Hoa hồng Shopee trên sản phẩm(₫)',
-        'Hoa hồng Xtra trên sản phẩm(₫)',
-        'Giá(₫)',
-        'Số lượng'
-    ]
-
-    for col in money_cols:
-        if col in df.columns:
-            df[col] = (
-                df[col].astype(str)
-                .str.replace(',', '')
-                .str.replace('₫', '')
-                .replace('nan', '0')
-            )
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-
-    def classify_source(row):
-        kenh = str(row.get('Kênh', '')).lower()
-        loai = str(row.get('Loại thuộc tính', '')).lower()
-
-        if 'video' in kenh:
-            return 'Shopee Video'
-        if 'live' in kenh:
-            return 'Shopee Live'
-        if 'người giới thiệu' in loai or 'social' in loai:
-            return 'Social'
-        if loai in ['', 'nan', 'không xác định']:
-            return 'Không xác định'
-        return 'Khác'
-
-    df['Phân loại nguồn'] = df.apply(classify_source, axis=1)
+def load_data():
+    df = pd.read_csv("data.csv")  
+    df['Ngày'] = pd.to_datetime(df['Ngày'])
     return df
 
-# =============================
-# 3. GIAO DIỆN CHÍNH
-# =============================
-st.title("🧧 Shopee Affiliate Analytics Dashboard by BLACKWHITE29")
 
-uploaded_file = st.file_uploader("", type="csv")
+df = load_data()
 
-if uploaded_file:
-    df = load_data(uploaded_file)
+# =========================
+# FILTER
+# =========================
+st.title("📊 Shopee Affiliate Dashboard")
 
-    # -------------------------
-    # BỘ LỌC NGÀY
-    # -------------------------
-    st.subheader("Chọn khoảng thời gian")
+col_f1, col_f2 = st.columns(2)
+with col_f1:
     date_range = st.date_input(
-        "Thời gian:",
-        [df['Ngày'].min(), df['Ngày'].max()],
-        format="DD/MM/YYYY"
+        "Chọn khoảng ngày",
+        [df['Ngày'].min(), df['Ngày'].max()]
     )
 
-    df_filtered = df[
-        (df['Ngày'] >= date_range[0]) &
-        (df['Ngày'] <= date_range[1])
-    ]
+with col_f2:
+    source_filter = st.multiselect(
+        "Nguồn đơn hàng",
+        options=df['Phân loại nguồn'].unique(),
+        default=df['Phân loại nguồn'].unique()
+    )
 
-    st.divider()
+df_filtered = df[
+    (df['Ngày'] >= pd.to_datetime(date_range[0])) &
+    (df['Ngày'] <= pd.to_datetime(date_range[1])) &
+    (df['Phân loại nguồn'].isin(source_filter))
+]
 
-    # =============================
-    # 4. THỐNG KÊ TỔNG QUAN
-    # =============================
-    total_gmv = df_filtered['Giá trị đơn hàng (₫)'].sum()
-    total_comm = df_filtered['Tổng hoa hồng đơn hàng(₫)'].sum()
-    total_orders = len(df_filtered)
+# =========================
+# BIỂU ĐỒ
+# =========================
+st.header("📈 Biểu đồ thống kê")
+col_a, col_b = st.columns(2)
 
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Tổng Doanh Thu", f"{total_gmv:,.0f}".replace(',', '.') + " ₫")
-    m2.metric("Tổng Hoa Hồng", f"{total_comm:,.0f}".replace(',', '.') + " ₫")
-    m3.metric("Tổng Đơn Hàng", f"{total_orders:,}".replace(',', '.'))
+# =========================
+# CỘT TRÁI
+# =========================
+with col_a:
+    # --- Hoa hồng theo ngày
+    daily = (
+        df_filtered
+        .groupby('Ngày')['Tổng hoa hồng đơn hàng(₫)']
+        .sum()
+        .reset_index()
+    )
 
-    st.divider()
+    daily['Ngày_str'] = daily['Ngày'].dt.strftime('%d/%m/%Y')
+    daily['Tien_str'] = daily['Tổng hoa hồng đơn hàng(₫)'].apply(format_vnd)
 
-    # =============================
-    # 5. BIỂU ĐỒ THỐNG KÊ
-    # =============================
-    st.header("3. Biểu đồ thống kê")
-    col_a, col_b = st.columns(2)
+    fig1 = px.line(
+        daily,
+        x='Ngày',
+        y='Tổng hoa hồng đơn hàng(₫)',
+        title="Hoa hồng theo ngày"
+    )
 
-    # ---- CỘT TRÁI
-    with col_a:
-        daily = df_filtered.groupby('Ngày')['Tổng hoa hồng đơn hàng(₫)'].sum().reset_index()
-        daily['Ngày_str'] = daily['Ngày'].apply(lambda x: x.strftime('%d/%m/%Y'))
+    fig1.update_traces(
+        hovertemplate=(
+            "Ngày: %{customdata[0]}<br>"
+            "Hoa hồng: %{customdata[1]}<extra></extra>"
+        ),
+        customdata=daily[['Ngày_str', 'Tien_str']]
+    )
 
-        fig1 = px.line(daily, x='Ngày', y='Tổng hoa hồng đơn hàng(₫)', title="Hoa hồng theo ngày")
-        fig1.update_layout(locale="vi")
-        fig1.update_traces(
-            hovertemplate="Ngày: %{customdata}<br>Hoa hồng: %{y:,.0f} ₫<extra></extra>",
-            customdata=daily['Ngày_str']
+    st.plotly_chart(fig1, use_container_width=True)
+
+    # --- Tỷ trọng theo kênh
+    source_comm = (
+        df_filtered
+        .groupby('Phân loại nguồn')['Tổng hoa hồng đơn hàng(₫)']
+        .sum()
+        .reset_index()
+    )
+    source_comm['Tien_str'] = source_comm['Tổng hoa hồng đơn hàng(₫)'].apply(format_vnd)
+
+    fig2 = px.pie(
+        source_comm,
+        names='Phân loại nguồn',
+        values='Tổng hoa hồng đơn hàng(₫)',
+        title="Tỷ trọng đơn hàng theo kênh"
+    )
+
+    fig2.update_traces(
+        hovertemplate=(
+            "Kênh: %{label}<br>"
+            "Hoa hồng: %{customdata}<br>"
+            "Tỷ trọng: %{percent}<extra></extra>"
+        ),
+        customdata=source_comm['Tien_str']
+    )
+
+    st.plotly_chart(fig2, use_container_width=True)
+
+# =========================
+# CỘT PHẢI
+# =========================
+with col_b:
+    # --- Hoa hồng theo giờ
+    hourly = (
+        df_filtered
+        .groupby('Giờ')['Tổng hoa hồng đơn hàng(₫)']
+        .sum()
+        .reset_index()
+    )
+
+    hourly['Tien_str'] = hourly['Tổng hoa hồng đơn hàng(₫)'].apply(format_vnd)
+
+    fig3 = px.bar(
+        hourly,
+        x='Giờ',
+        y='Tổng hoa hồng đơn hàng(₫)',
+        title="Hoa hồng theo khung giờ"
+    )
+
+    fig3.update_traces(
+        hovertemplate=(
+            "Giờ: %{x}h<br>"
+            "Hoa hồng: %{customdata}<extra></extra>"
+        ),
+        customdata=hourly['Tien_str']
+    )
+
+    st.plotly_chart(fig3, use_container_width=True)
+
+    # --- Top 10 danh mục
+    cat_data = (
+        df_filtered
+        .groupby('L1 Danh mục toàn cầu')
+        .agg(
+            So_don=('ID đơn hàng', 'count'),
+            Hoa_hong=('Tổng hoa hồng đơn hàng(₫)', 'sum')
         )
-        st.plotly_chart(fig1, use_container_width=True)
+        .nlargest(10, 'Hoa_hong')
+        .reset_index()
+    )
 
-        fig2 = px.pie(
-            df_filtered,
-            names='Phân loại nguồn',
-            values='Tổng hoa hồng đơn hàng(₫)',
-            title="Tỷ trọng đơn hàng theo kênh"
-        )
-        fig2.update_layout(locale="vi")
-        fig2.update_traces(
-            hovertemplate=(
-                "Kênh: %{label}<br>"
-                "Hoa hồng: %{value:,.0f} ₫<br>"
-                "Tỷ trọng: %{percent}<extra></extra>"
-            )
-        )
-        st.plotly_chart(fig2, use_container_width=True)
+    cat_data['Tien_str'] = cat_data['Hoa_hong'].apply(format_vnd)
 
-    # ---- CỘT PHẢI
-    with col_b:
-        hourly = df_filtered.groupby('Giờ')['Tổng hoa hồng đơn hàng(₫)'].sum().reset_index()
+    fig4 = px.bar(
+        cat_data,
+        x='Hoa_hong',
+        y='L1 Danh mục toàn cầu',
+        orientation='h',
+        title="Top 10 danh mục"
+    )
 
-        fig3 = px.bar(hourly, x='Giờ', y='Tổng hoa hồng đơn hàng(₫)', title="Hoa hồng theo khung giờ")
-        fig3.update_layout(locale="vi")
-        fig3.update_traces(
-            hovertemplate="Giờ: %{x}h<br>Hoa hồng: %{y:,.0f} ₫<extra></extra>"
-        )
-        st.plotly_chart(fig3, use_container_width=True)
+    fig4.update_traces(
+        hovertemplate=(
+            "Danh mục: %{y}<br>"
+            "Số đơn: %{customdata[0]:,}<br>"
+            "Hoa hồng: %{customdata[1]}<extra></extra>"
+        ),
+        customdata=cat_data[['So_don', 'Tien_str']]
+    )
 
-        cat = (
-            df_filtered
-            .groupby('L1 Danh mục toàn cầu')
-            .agg(
-                Số_đơn=('ID đơn hàng', 'count'),
-                Hoa_hồng=('Tổng hoa hồng đơn hàng(₫)', 'sum')
-            )
-            .nlargest(10, 'Hoa_hồng')
-            .reset_index()
-        )
-
-        fig4 = px.bar(cat, x='Hoa_hồng', y='L1 Danh mục toàn cầu',
-                      orientation='h', title="Top 10 Danh mục")
-        fig4.update_layout(locale="vi")
-        fig4.update_traces(
-            hovertemplate=(
-                "Danh mục: %{y}<br>"
-                "Số đơn: %{customdata[0]:,}<br>"
-                "Hoa hồng: %{x:,.0f} ₫<extra></extra>"
-            ),
-            customdata=cat[['Số_đơn']]
-        )
-        st.plotly_chart(fig4, use_container_width=True)
-
-    st.divider()
-    st.header("5. Chi tiết đơn hàng")
-    st.dataframe(df_filtered, use_container_width=True)
+    st.plotly_chart(fig4, use_container_width=True)
