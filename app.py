@@ -25,6 +25,21 @@ st.markdown("""
     .stFileUploader section button {
         display: none !important;
     }
+    
+    /* Style cho bảng dataframe */
+    .stDataFrame {
+        font-size: 14px;
+    }
+    .stDataFrame th {
+        background-color: #f0f2f6;
+        font-weight: bold;
+        text-align: center !important;
+        padding: 12px 8px !important;
+    }
+    .stDataFrame td {
+        text-align: left !important;
+        padding: 10px 8px !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -89,7 +104,7 @@ if uploaded_file is not None:
 
         st.markdown("---")
 
-        # 3. MỤC 1: THỐNG KÊ TỔNG QUAN
+        # 3. MỤC 1: THỐNG KÊ TỔNG QUAN - SẮP XẾP LẠI THỨ TỰ
         st.header("1. Thống kê tổng quan")
         
         # TÍNH TOÁN THEO ĐƠN HÀNG (ID đơn hàng unique)
@@ -98,6 +113,8 @@ if uploaded_file is not None:
         total_orders = df_filtered['ID đơn hàng'].nunique()  # ĐẾM UNIQUE ORDER ID
         total_clicks = df_filtered['Thời gian Click'].nunique()  # SỐ CLICK UNIQUE
         total_quantity_sold = int(df_filtered['Số lượng'].sum())  # TỔNG SỐ LƯỢNG ĐÃ BÁN
+        commission_rate = (total_comm/total_gmv*100 if total_gmv > 0 else 0)
+        avg_commission_per_order = (total_comm/total_orders if total_orders > 0 else 0)
         
         # Tính hoa hồng theo kênh (group by order ID để tránh tính trùng)
         comm_by_channel = df_filtered.groupby(['ID đơn hàng', 'Phân loại nguồn'])['Tổng hoa hồng đơn hàng(₫)'].first().reset_index()
@@ -105,21 +122,26 @@ if uploaded_file is not None:
         comm_instagram = comm_by_channel[comm_by_channel['Phân loại nguồn'] == 'Instagram']['Tổng hoa hồng đơn hàng(₫)'].sum()
         comm_others = comm_by_channel[comm_by_channel['Phân loại nguồn'] == 'Others']['Tổng hoa hồng đơn hàng(₫)'].sum()
 
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Tổng Doanh Thu", format_currency(total_gmv))
-        m2.metric("Tổng Hoa Hồng", format_currency(total_comm))
-        m3.metric("Tổng Đơn Hàng", f"{total_orders:,}".replace(',', '.'))
+        # DÒNG 1: Tổng Doanh Thu, Tổng Hoa Hồng, Tổng Đơn Hàng
+        col1, col2, col3 = st.columns(3)
+        col1.metric("💰 Tổng Doanh Thu", format_currency(total_gmv))
+        col2.metric("💵 Tổng Hoa Hồng", format_currency(total_comm))
+        col3.metric("📦 Tổng Đơn Hàng", f"{total_orders:,}".replace(',', '.'))
         
-        m4, m5, m6, m7 = st.columns(4)
-        m4.metric("HH TB/Đơn", format_currency(total_comm/total_orders if total_orders > 0 else 0))
-        m5.metric("HH Facebook", format_currency(comm_facebook))
-        m6.metric("HH Instagram", format_currency(comm_instagram))
-        m7.metric("HH Others", format_currency(comm_others))
+        # DÒNG 2: Tỷ Lệ Hoa Hồng, Số Lượng Click, Số Lượng Đã Bán
+        col4, col5, col6 = st.columns(3)
+        col4.metric("📊 Tỷ Lệ Hoa Hồng", f"{commission_rate:.2f}%")
+        col5.metric("👆 Số Lượng Click", f"{total_clicks:,}".replace(',', '.'))
+        col6.metric("🛒 Số Lượng Đã Bán", f"{total_quantity_sold:,}".replace(',', '.'))
         
-        m8, m9, m10 = st.columns(3)
-        m8.metric("Tỷ Lệ Hoa Hồng", f"{(total_comm/total_gmv*100 if total_gmv > 0 else 0):.2f}%")
-        m9.metric("Số Lượng Click", f"{total_clicks:,}".replace(',', '.'))
-        m10.metric("Số Lượng Đã Bán", f"{total_quantity_sold:,}".replace(',', '.'))
+        # DÒNG 3: HH TB/Đơn, HH Facebook, HH Instagram, HH Others
+        col7, col8, col9, col10 = st.columns(4)
+        col7.metric("📈 HH TB/Đơn", format_currency(avg_commission_per_order))
+        col8.metric("📘 HH Facebook", format_currency(comm_facebook))
+        col9.metric("📷 HH Instagram", format_currency(comm_instagram))
+        col10.metric("📋 HH Others", format_currency(comm_others))
+
+        st.markdown("---")
 
         # MỤC 2: THỐNG KÊ ĐƠN HÀNG
         st.header("2. Thống kê đơn hàng")
@@ -206,8 +228,10 @@ if uploaded_file is not None:
             st.plotly_chart(fig4, use_container_width=True)
 
         st.markdown("---")
-        # TOP 20 SUBID
+        
+        # TOP 20 SUBID - CẢI THIỆN GIAO DIỆN BẢNG
         st.header("4. Top 20 SubID hiệu quả nhất")
+        
         sub_id_cols = ['Sub_id1', 'Sub_id2', 'Sub_id3', 'Sub_id4', 'Sub_id5']
         sub_list = []
         for col in sub_id_cols:
@@ -217,12 +241,61 @@ if uploaded_file is not None:
                 sub_list.append(temp)
         
         if sub_list:
-            all_subs = pd.concat(sub_list).groupby('SubID').agg(Số_đơn=('SubID','count'), Hoa_hồng=('HoaHồng','sum')).reset_index().sort_values('Số_đơn', ascending=False).head(20)
-            all_subs.insert(0, 'STT', range(1, len(all_subs) + 1))
-            display_df = all_subs.copy()
-            display_df['Hoa_hồng'] = display_df['Hoa_hồng'].apply(format_currency)
-            display_df['Số_đơn'] = display_df['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.'))
-            st.dataframe(display_df, use_container_width=True, hide_index=True)
+            all_subs = pd.concat(sub_list).groupby('SubID').agg(
+                Số_đơn=('SubID','count'), 
+                Hoa_hồng=('HoaHồng','sum')
+            ).reset_index().sort_values('Số_đơn', ascending=False).head(20)
+            
+            # Tạo bảng hiển thị đẹp
+            display_df = pd.DataFrame({
+                'Xếp Hạng': range(1, len(all_subs) + 1),
+                'SubID': all_subs['SubID'].values,
+                'Số Đơn': all_subs['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.')).values,
+                'Tổng Hoa Hồng': all_subs['Hoa_hồng'].apply(format_currency).values,
+                'HH Trung Bình/Đơn': all_subs.apply(lambda row: format_currency(row['Hoa_hồng']/row['Số_đơn'] if row['Số_đơn'] > 0 else 0), axis=1).values
+            })
+            
+            # Hiển thị bảng với style đẹp
+            st.dataframe(
+                display_df,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Xếp Hạng": st.column_config.NumberColumn(
+                        "Xếp Hạng",
+                        help="Xếp hạng theo số đơn",
+                        width="small",
+                    ),
+                    "SubID": st.column_config.TextColumn(
+                        "SubID",
+                        help="Mã SubID",
+                        width="medium",
+                    ),
+                    "Số Đơn": st.column_config.TextColumn(
+                        "Số Đơn",
+                        help="Tổng số đơn hàng",
+                        width="small",
+                    ),
+                    "Tổng Hoa Hồng": st.column_config.TextColumn(
+                        "Tổng Hoa Hồng",
+                        help="Tổng hoa hồng kiếm được",
+                        width="medium",
+                    ),
+                    "HH Trung Bình/Đơn": st.column_config.TextColumn(
+                        "HH TB/Đơn",
+                        help="Hoa hồng trung bình mỗi đơn",
+                        width="medium",
+                    ),
+                },
+                height=600
+            )
+            
+            # Thêm thống kê tổng quan
+            st.markdown("---")
+            col_stat1, col_stat2, col_stat3 = st.columns(3)
+            col_stat1.metric("📊 Tổng SubID", len(all_subs))
+            col_stat2.metric("📦 Tổng Đơn (Top 20)", f"{all_subs['Số_đơn'].sum():,}".replace(',', '.'))
+            col_stat3.metric("💵 Tổng HH (Top 20)", format_currency(all_subs['Hoa_hồng'].sum()))
 
         st.markdown("---")
         
