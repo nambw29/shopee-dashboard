@@ -51,24 +51,17 @@ def load_data(file):
                      df[col] = df[col].astype(str).str.replace(',', '').str.replace('₫', '').replace('nan', '0')
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
 
-        # PHÂN LOẠI NGUỒN ĐƠN THEO LOGIC "NGƯỜI GIỚI THIỆU" CỦA SHOPEE
+        # PHÂN LOẠI NGUỒN ĐƠN THEO KÊNH THỰC TẾ
         def classify_source(row):
-            kenh = str(row.get('Kênh', '')).lower().strip()
-            # Lấy thông tin từ cột "Loại thuộc tính" - Đây là nơi Shopee ghi nhận nguồn gốc
-            loai_thuoc_tinh = str(row.get('Loại thuộc tính', '')).lower().strip()
+            kenh = str(row.get('Kênh', '')).strip()
             
-            # 1. Ưu tiên Kênh Video/Live của Shopee
-            if 'video' in kenh: return 'Shopee Video'
-            if 'live' in kenh or 'livestream' in kenh: return 'Shopee Live'
-            
-            # 2. Logic Social vs Không xác định theo "Loại thuộc tính"
-            # Thường Shopee để: "Người giới thiệu" (Social) hoặc "Không xác định" (Others)
-            if 'người giới thiệu' in loai_thuoc_tinh or 'social' in loai_thuoc_tinh:
-                return 'Social'
-            elif 'không xác định' in loai_thuoc_tinh or loai_thuoc_tinh == '' or loai_thuoc_tinh == 'nan':
+            # Giữ nguyên tên kênh từ dữ liệu gốc
+            if kenh in ['Facebook', 'Instagram', 'Zalo', 'Websites', 'Others']:
+                return kenh
+            elif kenh == '':
                 return 'Không xác định'
-            
-            return 'Khác'
+            else:
+                return kenh  # Giữ nguyên các kênh khác như EdgeBrowser, etc.
             
         df['Phân loại nguồn'] = df.apply(classify_source, axis=1)
         return df
@@ -98,13 +91,17 @@ if uploaded_file is not None:
 
         # 3. MỤC 1: THỐNG KÊ TỔNG QUAN
         st.header("1. Thống kê tổng quan")
+        
+        # TÍNH TOÁN THEO ĐƠN HÀNG (ID đơn hàng unique)
         total_gmv = df_filtered['Giá trị đơn hàng (₫)'].sum()
         total_comm = df_filtered['Tổng hoa hồng đơn hàng(₫)'].sum()
-        total_orders = len(df_filtered)
+        total_orders = df_filtered['ID đơn hàng'].nunique()  # ĐẾM UNIQUE ORDER ID
         
-        comm_v = df_filtered[df_filtered['Phân loại nguồn'] == 'Shopee Video']['Tổng hoa hồng đơn hàng(₫)'].sum()
-        comm_l = df_filtered[df_filtered['Phân loại nguồn'] == 'Shopee Live']['Tổng hoa hồng đơn hàng(₫)'].sum()
-        comm_s = df_filtered[df_filtered['Phân loại nguồn'] == 'Social']['Tổng hoa hồng đơn hàng(₫)'].sum()
+        # Tính hoa hồng theo kênh (group by order ID để tránh tính trùng)
+        comm_by_channel = df_filtered.groupby(['ID đơn hàng', 'Phân loại nguồn'])['Tổng hoa hồng đơn hàng(₫)'].first().reset_index()
+        comm_facebook = comm_by_channel[comm_by_channel['Phân loại nguồn'] == 'Facebook']['Tổng hoa hồng đơn hàng(₫)'].sum()
+        comm_instagram = comm_by_channel[comm_by_channel['Phân loại nguồn'] == 'Instagram']['Tổng hoa hồng đơn hàng(₫)'].sum()
+        comm_others = comm_by_channel[comm_by_channel['Phân loại nguồn'] == 'Others']['Tổng hoa hồng đơn hàng(₫)'].sum()
 
         m1, m2, m3 = st.columns(3)
         m1.metric("Tổng Doanh Thu", format_currency(total_gmv))
@@ -113,20 +110,28 @@ if uploaded_file is not None:
         
         m4, m5, m6, m7 = st.columns(4)
         m4.metric("HH TB/Đơn", format_currency(total_comm/total_orders if total_orders > 0 else 0))
-        m5.metric("HH Shopee Video", format_currency(comm_v))
-        m6.metric("HH Shopee Live", format_currency(comm_l))
-        m7.metric("HH Social", format_currency(comm_s))
+        m5.metric("HH Facebook", format_currency(comm_facebook))
+        m6.metric("HH Instagram", format_currency(comm_instagram))
+        m7.metric("HH Others", format_currency(comm_others))
         st.metric("Tỷ Lệ Hoa Hồng", f"{(total_comm/total_gmv*100 if total_gmv > 0 else 0):.2f}%")
 
         # MỤC 2: THỐNG KÊ ĐƠN HÀNG
         st.header("2. Thống kê đơn hàng")
+        
+        # Đếm đơn hàng unique theo kênh
+        orders_by_channel = df_filtered.groupby('Phân loại nguồn')['ID đơn hàng'].nunique()
+        orders_facebook = orders_by_channel.get('Facebook', 0)
+        orders_instagram = orders_by_channel.get('Instagram', 0)
+        orders_others = orders_by_channel.get('Others', 0)
+        orders_cancelled = df_filtered[df_filtered['Trạng thái đặt hàng'].str.contains('Hủy', case=False, na=False)]['ID đơn hàng'].nunique()
+        
         c1, c2, c3, c4, c5, c6 = st.columns(6)
         c1.metric("HH Shopee", format_currency(df_filtered['Hoa hồng Shopee trên sản phẩm(₫)'].sum()))
         c2.metric("HH Xtra", format_currency(df_filtered['Hoa hồng Xtra trên sản phẩm(₫)'].sum()))
-        c3.metric("Đơn Shopee Video", f"{df_filtered[df_filtered['Phân loại nguồn'] == 'Shopee Video'].shape[0]:,}".replace(',', '.'))
-        c4.metric("Đơn Shopee Live", f"{df_filtered[df_filtered['Phân loại nguồn'] == 'Shopee Live'].shape[0]:,}".replace(',', '.'))
-        c5.metric("Đơn Social", f"{df_filtered[df_filtered['Phân loại nguồn'] == 'Social'].shape[0]:,}".replace(',', '.'))
-        c6.metric("Đơn Hủy", f"{df_filtered[df_filtered['Trạng thái đặt hàng'].str.contains('Hủy', case=False, na=False)].shape[0]:,}".replace(',', '.'))
+        c3.metric("Đơn Facebook", f"{orders_facebook:,}".replace(',', '.'))
+        c4.metric("Đơn Instagram", f"{orders_instagram:,}".replace(',', '.'))
+        c5.metric("Đơn Others", f"{orders_others:,}".replace(',', '.'))
+        c6.metric("Đơn Hủy", f"{orders_cancelled:,}".replace(',', '.'))
 
         st.markdown("---")
 
@@ -147,8 +152,23 @@ if uploaded_file is not None:
             )
             st.plotly_chart(fig1, use_container_width=True)
             
-            # Biểu đồ tròn - Tỷ trọng đơn hàng theo kênh
-            fig2 = px.pie(df_filtered, names='Phân loại nguồn', title="Tỷ trọng đơn hàng theo kênh")
+            # Biểu đồ tròn - Tỷ trọng đơn hàng theo kênh (ĐẾM UNIQUE ORDER)
+            channel_orders = df_filtered.groupby('Phân loại nguồn')['ID đơn hàng'].nunique().reset_index()
+            channel_orders.columns = ['Kênh', 'Số đơn']
+            channel_orders['Tỷ trọng'] = (channel_orders['Số đơn'] / channel_orders['Số đơn'].sum() * 100).round(2)
+            
+            fig2 = px.pie(
+                channel_orders, 
+                names='Kênh', 
+                values='Số đơn',
+                title="Tỷ trọng đơn hàng theo kênh",
+                hover_data=['Tỷ trọng']
+            )
+            fig2.update_traces(
+                textposition='inside',
+                textinfo='percent+label',
+                hovertemplate="<b>%{label}</b><br>Số đơn: %{value:,}<br>Tỷ trọng: %{customdata[0]:.2f}%<extra></extra>"
+            )
             st.plotly_chart(fig2, use_container_width=True)
 
         with col_b:
