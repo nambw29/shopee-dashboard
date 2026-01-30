@@ -149,8 +149,25 @@ fig1.update_traces(
 st.plotly_chart(fig1, use_container_width=True)
 
             
-            fig2 = px.pie(df_filtered, names='Phân loại nguồn', title="Tỷ trọng đơn hàng theo kênh")
-            st.plotly_chart(fig2, use_container_width=True)
+fig2 = px.pie(
+    df_filtered,
+    names='Phân loại nguồn',
+    values='Tổng hoa hồng đơn hàng(₫)',   # 👈 nên có values để hover rõ tiền
+    title="Tỷ trọng đơn hàng theo kênh"
+)
+
+fig2.update_layout(locale="vi")
+
+fig2.update_traces(
+    hovertemplate=(
+        "Kênh: %{label}<br>"
+        "Hoa hồng: %{value:,.0f} ₫<br>"
+        "Tỷ trọng: %{percent}<extra></extra>"
+    )
+)
+
+st.plotly_chart(fig2, use_container_width=True)
+
 
         with col_b:
             hourly_comm = df_filtered.groupby('Giờ')['Tổng hoa hồng đơn hàng(₫)'].sum().reset_index()
