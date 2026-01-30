@@ -151,12 +151,30 @@ if uploaded_file is not None:
             fig2 = px.pie(df_filtered, names='Phân loại nguồn', title="Tỷ trọng đơn hàng theo kênh")
             st.plotly_chart(fig2, use_container_width=True)
 
-        with col_b:
-            # HH theo giờ
-            hourly_comm = df_filtered.groupby('Giờ')['Tổng hoa hồng đơn hàng(₫)'].sum().reset_index()
-            fig3 = px.bar(hourly_comm, x='Giờ', y='Tổng hoa hồng đơn hàng(₫)', title="Hoa hồng theo khung giờ")
-            fig3.update_traces(hovertemplate="Giờ: %{x}h<br>Hoa hồng: %{y:,.0f} VNĐ".replace(',', '.'))
-            st.plotly_chart(fig3, use_container_width=True)
+with col_b:
+    # HH theo giờ
+    hourly_comm = (
+        df_filtered
+        .groupby('Giờ')['Tổng hoa hồng đơn hàng(₫)']
+        .sum()
+        .reset_index()
+    )
+
+    fig3 = px.bar(
+        hourly_comm,
+        x='Giờ',
+        y='Tổng hoa hồng đơn hàng(₫)',
+        title="Hoa hồng theo khung giờ"
+    )
+
+    # Set locale Việt Nam để Plotly tự dùng dấu .
+    fig3.update_layout(locale="vi")
+
+    fig3.update_traces(
+        hovertemplate="Giờ: %{x}h<br>Hoa hồng: %{y:,.0f} ₫<extra></extra>"
+    )
+
+    st.plotly_chart(fig3, use_container_width=True)
             
             # Top 10 Danh mục
             cat_data = df_filtered.groupby('L1 Danh mục toàn cầu').agg(
