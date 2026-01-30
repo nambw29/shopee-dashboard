@@ -132,18 +132,43 @@ if uploaded_file is not None:
         with col_a:
             daily_comm = df_filtered.groupby('Ngày')['Tổng hoa hồng đơn hàng(₫)'].sum().reset_index()
             daily_comm['Ngày_str'] = daily_comm['Ngày'].apply(lambda x: x.strftime('%d/%m/%Y'))
-            fig1 = px.line(daily_comm, x='Ngày', y='Tổng hoa hồng đơn hàng(₫)', title="Hoa hồng theo ngày")
-            fig1.update_traces(hovertemplate="Ngày: %{customdata}<br>Hoa hồng: %{y:,.0f} ₫".replace(',', '.'), customdata=daily_comm['Ngày_str'])
-            st.plotly_chart(fig1, use_container_width=True)
+fig1 = px.line(
+    daily_comm,
+    x='Ngày',
+    y='Tổng hoa hồng đơn hàng(₫)',
+    title="Hoa hồng theo ngày"
+)
+
+fig1.update_layout(locale="vi")
+
+fig1.update_traces(
+    hovertemplate="Ngày: %{customdata}<br>Hoa hồng: %{y:,.0f} ₫<extra></extra>",
+    customdata=daily_comm['Ngày_str']
+)
+
+st.plotly_chart(fig1, use_container_width=True)
+
             
             fig2 = px.pie(df_filtered, names='Phân loại nguồn', title="Tỷ trọng đơn hàng theo kênh")
             st.plotly_chart(fig2, use_container_width=True)
 
         with col_b:
             hourly_comm = df_filtered.groupby('Giờ')['Tổng hoa hồng đơn hàng(₫)'].sum().reset_index()
-            fig3 = px.bar(hourly_comm, x='Giờ', y='Tổng hoa hồng đơn hàng(₫)', title="Hoa hồng theo khung giờ")
-            fig3.update_traces(hovertemplate="Giờ: %{x}h<br>Hoa hồng: %{y:,.0f} ₫".replace(',', '.'))
-            st.plotly_chart(fig3, use_container_width=True)
+fig3 = px.bar(
+    hourly_comm,
+    x='Giờ',
+    y='Tổng hoa hồng đơn hàng(₫)',
+    title="Hoa hồng theo khung giờ"
+)
+
+fig3.update_layout(locale="vi")
+
+fig3.update_traces(
+    hovertemplate="Giờ: %{x}h<br>Hoa hồng: %{y:,.0f} ₫<extra></extra>"
+)
+
+st.plotly_chart(fig3, use_container_width=True)
+
             
             cat_data = df_filtered.groupby('L1 Danh mục toàn cầu').agg(Số_đơn=('ID đơn hàng', 'count'), Hoa_hồng=('Tổng hoa hồng đơn hàng(₫)', 'sum')).nlargest(10, 'Hoa_hồng').reset_index()
             fig4 = px.bar(cat_data, x='Hoa_hồng', y='L1 Danh mục toàn cầu', orientation='h', title="Top 10 Danh mục")
