@@ -96,6 +96,8 @@ if uploaded_file is not None:
         total_gmv = df_filtered['Giá trị đơn hàng (₫)'].sum()
         total_comm = df_filtered['Tổng hoa hồng đơn hàng(₫)'].sum()
         total_orders = df_filtered['ID đơn hàng'].nunique()  # ĐẾM UNIQUE ORDER ID
+        total_clicks = df_filtered['Thời gian Click'].nunique()  # SỐ CLICK UNIQUE
+        total_quantity_sold = int(df_filtered['Số lượng'].sum())  # TỔNG SỐ LƯỢNG ĐÃ BÁN
         
         # Tính hoa hồng theo kênh (group by order ID để tránh tính trùng)
         comm_by_channel = df_filtered.groupby(['ID đơn hàng', 'Phân loại nguồn'])['Tổng hoa hồng đơn hàng(₫)'].first().reset_index()
@@ -113,7 +115,11 @@ if uploaded_file is not None:
         m5.metric("HH Facebook", format_currency(comm_facebook))
         m6.metric("HH Instagram", format_currency(comm_instagram))
         m7.metric("HH Others", format_currency(comm_others))
-        st.metric("Tỷ Lệ Hoa Hồng", f"{(total_comm/total_gmv*100 if total_gmv > 0 else 0):.2f}%")
+        
+        m8, m9, m10 = st.columns(3)
+        m8.metric("Tỷ Lệ Hoa Hồng", f"{(total_comm/total_gmv*100 if total_gmv > 0 else 0):.2f}%")
+        m9.metric("Số Lượng Click", f"{total_clicks:,}".replace(',', '.'))
+        m10.metric("Số Lượng Đã Bán", f"{total_quantity_sold:,}".replace(',', '.'))
 
         # MỤC 2: THỐNG KÊ ĐƠN HÀNG
         st.header("2. Thống kê đơn hàng")
@@ -219,5 +225,50 @@ if uploaded_file is not None:
             st.dataframe(display_df, use_container_width=True, hide_index=True)
 
         st.markdown("---")
+        
+        # MỤC 5: CHI TIẾT ĐƠN HÀNG
         st.header("5. Chi Tiết Đơn Hàng")
-        st.dataframe(df_filtered, use_container_width=True)
+        
+        # Chuẩn bị dữ liệu chi tiết
+        detail_cols = ['ID đơn hàng', 'Tên Shop', 'Tên Item', 'Giá(₫)', 'Số lượng', 
+                       'Tổng hoa hồng đơn hàng(₫)', 'Trạng thái đặt hàng', 'Kênh', 
+                       'Sub_id1', 'Sub_id2', 'Sub_id3', 'Sub_id4', 'Sub_id5']
+        
+        df_detail = df_filtered[detail_cols].copy()
+        
+        # Format lại cột Giá và Tổng hoa hồng
+        df_detail['Giá(₫)'] = df_detail['Giá(₫)'].apply(lambda x: format_currency(x))
+        df_detail['Tổng hoa hồng đơn hàng(₫)'] = df_detail['Tổng hoa hồng đơn hàng(₫)'].apply(lambda x: format_currency(x))
+        df_detail['Số lượng'] = df_detail['Số lượng'].apply(lambda x: int(x))
+        
+        # Đổi tên cột cho dễ đọc
+        df_detail.columns = ['ID Đơn Hàng', 'Tên Shop', 'Tên Sản Phẩm', 'Giá', 'Số Lượng', 
+                            'Tổng Hoa Hồng', 'Trạng Thái', 'Kênh', 
+                            'SubID 1', 'SubID 2', 'SubID 3', 'SubID 4', 'SubID 5']
+        
+        # Tạo tabs cho các loại đơn hàng
+        tab1, tab2, tab3 = st.tabs([
+            f"📦 Tất cả đơn ({len(df_detail):,} dòng)".replace(',', '.'),
+            f"⏳ Đơn đang chờ xử lý ({df_detail[df_detail['Trạng Thái'].str.contains('chờ xử lý', case=False, na=False)].shape[0]:,} dòng)".replace(',', '.'),
+            f"❌ Đơn đã hủy ({df_detail[df_detail['Trạng Thái'].str.contains('Hủy', case=False, na=False)].shape[0]:,} dòng)".replace(',', '.')
+        ])
+        
+        with tab1:
+            st.markdown(f"**Tổng số dòng:** {len(df_detail):,}".replace(',', '.'))
+            st.dataframe(df_detail, use_container_width=True, hide_index=True, height=500)
+        
+        with tab2:
+            df_pending = df_detail[df_detail['Trạng Thái'].str.contains('chờ xử lý', case=False, na=False)]
+            st.markdown(f"**Tổng số dòng:** {len(df_pending):,}".replace(',', '.'))
+            if len(df_pending) > 0:
+                st.dataframe(df_pending, use_container_width=True, hide_index=True, height=500)
+            else:
+                st.info("Không có đơn hàng đang chờ xử lý")
+        
+        with tab3:
+            df_cancelled = df_detail[df_detail['Trạng Thái'].str.contains('Hủy', case=False, na=False)]
+            st.markdown(f"**Tổng số dòng:** {len(df_cancelled):,}".replace(',', '.'))
+            if len(df_cancelled) > 0:
+                st.dataframe(df_cancelled, use_container_width=True, hide_index=True, height=500)
+            else:
+                st.info("Không có đơn hàng đã hủy")
