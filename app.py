@@ -170,7 +170,7 @@ if uploaded_file is not None:
         hh_shopee = df_filtered['Hoa hồng Shopee trên sản phẩm(₫)'].sum()
         hh_xtra = df_filtered['Hoa hồng Xtra trên sản phẩm(₫)'].sum()
         commission_rate = (total_comm/total_gmv*100 if total_gmv > 0 else 0)
-        total_clicks = df_filtered['Thời gian Click'].nunique()
+        total_clicks = df_filtered['Thời gian Click'].notna().sum()
         total_quantity_sold = int(df_filtered['Số lượng'].sum())
         avg_commission_per_order = (total_comm/total_orders if total_orders > 0 else 0)
         
@@ -263,18 +263,22 @@ if uploaded_file is not None:
             channel_stats.columns = ['Kênh', 'Số đơn', 'Hoa hồng']
             channel_stats['Tỷ trọng'] = (channel_stats['Số đơn'] / channel_stats['Số đơn'].sum() * 100).round(2)
             channel_stats['Hoa_hồng_formatted'] = channel_stats['Hoa hồng'].apply(format_currency)
+            channel_stats['Số_đơn_formatted'] = channel_stats['Số đơn'].apply(lambda x: f"{x:,}".replace(',', '.'))
             
             fig2 = px.pie(
                 channel_stats, 
                 names='Kênh', 
                 values='Số đơn',
-                title="Tỷ trọng đơn hàng theo kênh",
-                hover_data=['Tỷ trọng', 'Hoa_hồng_formatted']
+                title="Tỷ trọng đơn hàng theo kênh"
             )
             fig2.update_traces(
                 textposition='inside',
                 textinfo='percent+label',
-                hovertemplate="<b>%{label}</b><br>Số đơn: %{value:,}<br>Tỷ trọng: %{customdata[0]:.2f}%<br>Hoa hồng: %{customdata[1]}<extra></extra>"
+                hovertemplate="<b>%{label}</b><br>" +
+                             "Số đơn: %{customdata[0]}<br>" +
+                             "Tỷ trọng: %{customdata[1]:.2f}%<br>" +
+                             "Hoa hồng: %{customdata[2]}<extra></extra>",
+                customdata=channel_stats[['Số_đơn_formatted', 'Tỷ trọng', 'Hoa_hồng_formatted']]
             )
             st.plotly_chart(fig2, use_container_width=True)
 
