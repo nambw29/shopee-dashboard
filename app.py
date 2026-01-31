@@ -52,7 +52,23 @@ def format_currency(value):
 @st.cache_data
 def load_data(file):
     try:
-        df = pd.read_csv(file)
+        # Thử đọc với encoding utf-8-sig để xử lý BOM
+        try:
+            df = pd.read_csv(file, encoding='utf-8-sig')
+        except:
+            # Nếu lỗi, thử encoding khác
+            file.seek(0)  # Reset file pointer
+            try:
+                df = pd.read_csv(file, encoding='utf-8')
+            except:
+                file.seek(0)
+                df = pd.read_csv(file, encoding='latin1')
+        
+        # Kiểm tra nếu DataFrame rỗng hoặc không có cột
+        if df.empty or len(df.columns) == 0:
+            st.error("File CSV không có dữ liệu hoặc không có cột. Vui lòng kiểm tra lại file.")
+            return None
+            
         df['Thời Gian Đặt Hàng'] = pd.to_datetime(df['Thời Gian Đặt Hàng'])
         df['Ngày'] = df['Thời Gian Đặt Hàng'].dt.date
         df['Giờ'] = df['Thời Gian Đặt Hàng'].dt.hour
