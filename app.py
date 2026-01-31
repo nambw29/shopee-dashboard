@@ -77,8 +77,21 @@ def load_data(file):
                 return 'Không xác định'
             else:
                 return kenh  # Giữ nguyên các kênh khác như EdgeBrowser, etc.
+        
+        # PHÂN LOẠI VIDEO/LIVE/SOCIAL DỰA VÀO SUB_ID3
+        def classify_content_type(row):
+            sub_id3 = str(row.get('Sub_id3', '')).lower().strip()
+            
+            if 'video' in sub_id3:
+                return 'Video'
+            elif 'live' in sub_id3:
+                return 'Live'
+            else:
+                return 'Social'
             
         df['Phân loại nguồn'] = df.apply(classify_source, axis=1)
+        df['Loại nội dung'] = df.apply(classify_content_type, axis=1)
+        
         return df
     except Exception as e:
         st.error(f"Lỗi: {e}")
@@ -87,36 +100,53 @@ def load_data(file):
 # --- GIAO DIỆN CHÍNH ---
 st.title("🧧 Shopee Affiliate Analytics Dashboard by BLACKWHITE29")
 
-uploaded_file = st.file_uploader("", type=['csv'])
+# BỐ TRÍ UPLOAD FILE VÀ CHỌN THỜI GIAN TRÊN 1 DÒNG
+col_upload, col_date = st.columns([1, 1])
+
+with col_upload:
+    st.markdown("### 📁 Tải lên file dữ liệu")
+    uploaded_file = st.file_uploader("", type=['csv'], label_visibility="collapsed")
+
+with col_date:
+    st.markdown("### 📅 Chọn khoảng thời gian")
+    if uploaded_file is not None:
+        df_temp = load_data(uploaded_file)
+        if df_temp is not None:
+            date_range = st.date_input(
+                "Thời gian:", 
+                [df_temp['Ngày'].min(), df_temp['Ngày'].max()], 
+                format="DD/MM/YYYY",
+                label_visibility="collapsed"
+            )
+    else:
+        st.info("Vui lòng tải lên file CSV")
+        date_range = None
 
 if uploaded_file is not None:
     df = load_data(uploaded_file)
     if df is not None:
         
-        # 2. Bộ lọc thời gian
-        st.markdown("### Chọn khoảng thời gian")
-        date_range = st.date_input("Thời gian:", [df['Ngày'].min(), df['Ngày'].max()], format="DD/MM/YYYY")
-        
-        if len(date_range) == 2:
+        # Lọc theo thời gian
+        if date_range and len(date_range) == 2:
             df_filtered = df[(df['Ngày'] >= date_range[0]) & (df['Ngày'] <= date_range[1])]
         else:
             df_filtered = df
 
         st.markdown("---")
 
-        # 3. MỤC 1: THỐNG KÊ TỔNG QUAN - SẮP XẾP LẠI THỨ TỰ
+        # 3. MỤC 1: THỐNG KÊ TỔNG QUAN
         st.header("1. Thống kê tổng quan")
         
         # TÍNH TOÁN THEO ĐƠN HÀNG (ID đơn hàng unique)
         total_gmv = df_filtered['Giá trị đơn hàng (₫)'].sum()
         total_comm = df_filtered['Tổng hoa hồng đơn hàng(₫)'].sum()
-        total_orders = df_filtered['ID đơn hàng'].nunique()  # ĐẾM UNIQUE ORDER ID
-        total_clicks = df_filtered['Thời gian Click'].nunique()  # SỐ CLICK UNIQUE
-        total_quantity_sold = int(df_filtered['Số lượng'].sum())  # TỔNG SỐ LƯỢNG ĐÃ BÁN
+        total_orders = df_filtered['ID đơn hàng'].nunique()
+        total_clicks = df_filtered['Thời gian Click'].nunique()
+        total_quantity_sold = int(df_filtered['Số lượng'].sum())
         commission_rate = (total_comm/total_gmv*100 if total_gmv > 0 else 0)
         avg_commission_per_order = (total_comm/total_orders if total_orders > 0 else 0)
         
-        # Tính hoa hồng theo kênh (group by order ID để tránh tính trùng)
+        # Tính hoa hồng theo kênh
         comm_by_channel = df_filtered.groupby(['ID đơn hàng', 'Phân loại nguồn'])['Tổng hoa hồng đơn hàng(₫)'].first().reset_index()
         comm_facebook = comm_by_channel[comm_by_channel['Phân loại nguồn'] == 'Facebook']['Tổng hoa hồng đơn hàng(₫)'].sum()
         comm_instagram = comm_by_channel[comm_by_channel['Phân loại nguồn'] == 'Instagram']['Tổng hoa hồng đơn hàng(₫)'].sum()
@@ -143,7 +173,7 @@ if uploaded_file is not None:
 
         st.markdown("---")
 
-        # MỤC 2: THỐNG KÊ ĐƠN HÀNG
+        # MỤC 2: THỐNG KÊ ĐƠN HÀNG - CẬP NHẬT
         st.header("2. Thống kê đơn hàng")
         
         # Đếm đơn hàng unique theo kênh
@@ -151,19 +181,36 @@ if uploaded_file is not None:
         orders_facebook = orders_by_channel.get('Facebook', 0)
         orders_instagram = orders_by_channel.get('Instagram', 0)
         orders_others = orders_by_channel.get('Others', 0)
+        
+        # Đếm đơn theo loại nội dung (Video/Live/Social)
+        orders_by_content = df_filtered.groupby('Loại nội dung')['ID đơn hàng'].nunique()
+        orders_video = orders_by_content.get('Video', 0)
+        orders_live = orders_by_content.get('Live', 0)
+        orders_social = orders_by_content.get('Social', 0)
+        
+        # Đơn 0 đồng và đơn hủy
+        orders_zero = df_filtered[df_filtered['Giá trị đơn hàng (₫)'] == 0]['ID đơn hàng'].nunique()
         orders_cancelled = df_filtered[df_filtered['Trạng thái đặt hàng'].str.contains('Hủy', case=False, na=False)]['ID đơn hàng'].nunique()
         
+        # DÒNG 1
         c1, c2, c3, c4, c5, c6 = st.columns(6)
-        c1.metric("HH Shopee", format_currency(df_filtered['Hoa hồng Shopee trên sản phẩm(₫)'].sum()))
-        c2.metric("HH Xtra", format_currency(df_filtered['Hoa hồng Xtra trên sản phẩm(₫)'].sum()))
-        c3.metric("Đơn Facebook", f"{orders_facebook:,}".replace(',', '.'))
-        c4.metric("Đơn Instagram", f"{orders_instagram:,}".replace(',', '.'))
-        c5.metric("Đơn Others", f"{orders_others:,}".replace(',', '.'))
-        c6.metric("Đơn Hủy", f"{orders_cancelled:,}".replace(',', '.'))
+        c1.metric("💎 HH Shopee", format_currency(df_filtered['Hoa hồng Shopee trên sản phẩm(₫)'].sum()))
+        c2.metric("⭐ HH Xtra", format_currency(df_filtered['Hoa hồng Xtra trên sản phẩm(₫)'].sum()))
+        c3.metric("📘 Đơn Facebook", f"{orders_facebook:,}".replace(',', '.'))
+        c4.metric("📷 Đơn Instagram", f"{orders_instagram:,}".replace(',', '.'))
+        c5.metric("📋 Đơn Others", f"{orders_others:,}".replace(',', '.'))
+        c6.metric("❌ Đơn Hủy", f"{orders_cancelled:,}".replace(',', '.'))
+        
+        # DÒNG 2
+        c7, c8, c9, c10 = st.columns(4)
+        c7.metric("🎬 Đơn Video", f"{orders_video:,}".replace(',', '.'))
+        c8.metric("📹 Đơn Live", f"{orders_live:,}".replace(',', '.'))
+        c9.metric("👥 Đơn Social", f"{orders_social:,}".replace(',', '.'))
+        c10.metric("🆓 Đơn 0 Đồng", f"{orders_zero:,}".replace(',', '.'))
 
         st.markdown("---")
 
-        # 4 & 5 & 6. BIỂU ĐỒ (Hover chuẩn 868.368.902 ₫)
+        # MỤC 3: BIỂU ĐỒ THỐNG KÊ
         st.header("3. Biểu đồ thống kê")
         col_a, col_b = st.columns(2)
         
@@ -180,7 +227,7 @@ if uploaded_file is not None:
             )
             st.plotly_chart(fig1, use_container_width=True)
             
-            # Biểu đồ tròn - Tỷ trọng đơn hàng theo kênh (ĐẾM UNIQUE ORDER)
+            # Biểu đồ tròn - Tỷ trọng đơn hàng theo kênh
             channel_orders = df_filtered.groupby('Phân loại nguồn')['ID đơn hàng'].nunique().reset_index()
             channel_orders.columns = ['Kênh', 'Số đơn']
             channel_orders['Tỷ trọng'] = (channel_orders['Số đơn'] / channel_orders['Số đơn'].sum() * 100).round(2)
@@ -211,16 +258,17 @@ if uploaded_file is not None:
             )
             st.plotly_chart(fig3, use_container_width=True)
             
-            # Top 10 Danh mục
+            # Top 10 Danh mục - CẬP NHẬT LABEL
             cat_data = df_filtered.groupby('L1 Danh mục toàn cầu').agg(
                 Số_đơn=('ID đơn hàng', 'count'), 
                 Hoa_hồng=('Tổng hoa hồng đơn hàng(₫)', 'sum')
             ).nlargest(10, 'Hoa_hồng').reset_index()
             
+            cat_data.columns = ['Danh mục sản phẩm', 'Số_đơn', 'Hoa hồng (₫)']
             cat_data['Số_đơn_formatted'] = cat_data['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.'))
-            cat_data['Hoa_hồng_formatted'] = cat_data['Hoa_hồng'].apply(format_currency)
+            cat_data['Hoa_hồng_formatted'] = cat_data['Hoa hồng (₫)'].apply(format_currency)
             
-            fig4 = px.bar(cat_data, x='Hoa_hồng', y='L1 Danh mục toàn cầu', orientation='h', title="Top 10 Danh mục")
+            fig4 = px.bar(cat_data, x='Hoa hồng (₫)', y='Danh mục sản phẩm', orientation='h', title="Top 10 Danh mục")
             fig4.update_traces(
                 hovertemplate="<b>Số đơn:</b> %{customdata[0]}<br><b>Hoa hồng:</b> %{customdata[1]}<extra></extra>",
                 customdata=cat_data[['Số_đơn_formatted', 'Hoa_hồng_formatted']]
@@ -229,7 +277,7 @@ if uploaded_file is not None:
 
         st.markdown("---")
         
-        # TOP 20 SUBID - CẢI THIỆN GIAO DIỆN BẢNG
+        # MỤC 4: TOP 20 SUBID
         st.header("4. Top 20 SubID hiệu quả nhất")
         
         sub_id_cols = ['Sub_id1', 'Sub_id2', 'Sub_id3', 'Sub_id4', 'Sub_id5']
@@ -289,18 +337,87 @@ if uploaded_file is not None:
                 },
                 height=600
             )
-            
-            # Thêm thống kê tổng quan
-            st.markdown("---")
-            col_stat1, col_stat2, col_stat3 = st.columns(3)
-            col_stat1.metric("📊 Tổng SubID", len(all_subs))
-            col_stat2.metric("📦 Tổng Đơn (Top 20)", f"{all_subs['Số_đơn'].sum():,}".replace(',', '.'))
-            col_stat3.metric("💵 Tổng HH (Top 20)", format_currency(all_subs['Hoa_hồng'].sum()))
 
         st.markdown("---")
         
-        # MỤC 5: CHI TIẾT ĐƠN HÀNG
-        st.header("5. Chi Tiết Đơn Hàng")
+        # MỤC 5: TOP 5 SẢN PHẨM NỔI BẬT
+        st.header("5. Top 5 Sản phẩm nổi bật")
+        
+        product_stats = df_filtered.groupby('Tên Item').agg(
+            GMV=('Giá trị đơn hàng (₫)', 'sum'),
+            Số_đơn=('ID đơn hàng', 'count'),
+            Hoa_hồng=('Tổng hoa hồng đơn hàng(₫)', 'sum')
+        ).reset_index()
+        
+        product_stats['Tỉ lệ hoa hồng'] = (product_stats['Hoa_hồng'] / product_stats['GMV'] * 100).round(2)
+        product_stats = product_stats.nlargest(5, 'Số_đơn').reset_index(drop=True)
+        
+        top_products = pd.DataFrame({
+            'STT': range(1, len(product_stats) + 1),
+            'Tên sản phẩm': product_stats['Tên Item'],
+            'Tổng GMV': product_stats['GMV'].apply(format_currency),
+            'Số đơn': product_stats['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.')),
+            'Hoa hồng': product_stats['Hoa_hồng'].apply(format_currency),
+            'Tỉ lệ hoa hồng': product_stats['Tỉ lệ hoa hồng'].apply(lambda x: f"{x:.2f}%")
+        })
+        
+        st.dataframe(
+            top_products,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "STT": st.column_config.NumberColumn("STT", width="small"),
+                "Tên sản phẩm": st.column_config.TextColumn("Tên sản phẩm", width="large"),
+                "Tổng GMV": st.column_config.TextColumn("Tổng GMV", width="medium"),
+                "Số đơn": st.column_config.TextColumn("Số đơn", width="small"),
+                "Hoa hồng": st.column_config.TextColumn("Hoa hồng", width="medium"),
+                "Tỉ lệ hoa hồng": st.column_config.TextColumn("Tỉ lệ hoa hồng", width="small"),
+            },
+            height=300
+        )
+
+        st.markdown("---")
+        
+        # MỤC 6: TOP 5 SHOP CÓ NHIỀU ĐƠN NHẤT
+        st.header("6. Top 5 Shop có nhiều đơn nhất")
+        
+        shop_stats = df_filtered.groupby('Tên Shop').agg(
+            GMV=('Giá trị đơn hàng (₫)', 'sum'),
+            Số_đơn=('ID đơn hàng', 'nunique'),
+            Hoa_hồng=('Tổng hoa hồng đơn hàng(₫)', 'sum')
+        ).reset_index()
+        
+        shop_stats['Tỉ lệ hoa hồng'] = (shop_stats['Hoa_hồng'] / shop_stats['GMV'] * 100).round(2)
+        shop_stats = shop_stats.nlargest(5, 'Số_đơn').reset_index(drop=True)
+        
+        top_shops = pd.DataFrame({
+            'STT': range(1, len(shop_stats) + 1),
+            'Tên shop': shop_stats['Tên Shop'],
+            'Tổng GMV': shop_stats['GMV'].apply(format_currency),
+            'Số đơn': shop_stats['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.')),
+            'Hoa hồng': shop_stats['Hoa_hồng'].apply(format_currency),
+            'Tỉ lệ hoa hồng': shop_stats['Tỉ lệ hoa hồng'].apply(lambda x: f"{x:.2f}%")
+        })
+        
+        st.dataframe(
+            top_shops,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "STT": st.column_config.NumberColumn("STT", width="small"),
+                "Tên shop": st.column_config.TextColumn("Tên shop", width="large"),
+                "Tổng GMV": st.column_config.TextColumn("Tổng GMV", width="medium"),
+                "Số đơn": st.column_config.TextColumn("Số đơn", width="small"),
+                "Hoa hồng": st.column_config.TextColumn("Hoa hồng", width="medium"),
+                "Tỉ lệ hoa hồng": st.column_config.TextColumn("Tỉ lệ hoa hồng", width="small"),
+            },
+            height=300
+        )
+
+        st.markdown("---")
+        
+        # MỤC 7: CHI TIẾT ĐƠN HÀNG
+        st.header("7. Chi tiết đơn hàng")
         
         # Chuẩn bị dữ liệu chi tiết
         detail_cols = ['ID đơn hàng', 'Tên Shop', 'Tên Item', 'Giá(₫)', 'Số lượng', 
