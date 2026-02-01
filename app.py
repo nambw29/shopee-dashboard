@@ -80,7 +80,9 @@ def load_data(file):
             return None
             
         df['Thời Gian Đặt Hàng'] = pd.to_datetime(df['Thời Gian Đặt Hàng'])
+        df['Thời gian Click'] = pd.to_datetime(df['Thời gian Click'], errors='coerce')
         df['Ngày'] = df['Thời Gian Đặt Hàng'].dt.date
+        df['Ngày Click'] = df['Thời gian Click'].dt.date
         df['Giờ'] = df['Thời Gian Đặt Hàng'].dt.hour
         
         cols_to_numeric = ['Giá trị đơn hàng (₫)', 'Tổng hoa hồng đơn hàng(₫)', 
@@ -92,30 +94,42 @@ def load_data(file):
                      df[col] = df[col].astype(str).str.replace(',', '').str.replace('₫', '').replace('nan', '0')
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
 
-        # PHÂN LOẠI NGUỒN ĐƠN - GỘP SOCIAL
+        # PHÂN LOẠI NGUỒN ĐƠN - GỘP FACEBOOK/INSTAGRAM THÀNH SOCIAL
         def classify_source(row):
             kenh = str(row.get('Kênh', '')).strip()
             
-            # Gộp Facebook, Instagram, Zalo thành Social
+            # Gộp các mạng xã hội thành Social
             if kenh in ['Facebook', 'Instagram', 'Zalo']:
                 return 'Social'
-            elif kenh in ['Websites', 'Others', 'EdgeBrowser'] or kenh == 'Others':
+            elif kenh == 'Others':
+                return 'Others'
+            elif kenh in ['Websites', 'EdgeBrowser']:
                 return 'Others'
             elif kenh == '':
                 return 'Không xác định'
             else:
                 return 'Others'
         
-        # PHÂN LOẠI VIDEO/LIVE DỰA VÀO SUB_ID3
+        # PHÂN LOẠI VIDEO/LIVE SHOPEE - DỰA VÀO LOẠI SẢN PHẨM/HH
         def classify_content_type(row):
-            sub_id3 = str(row.get('Sub_id3', '')).lower().strip()
+            # Kiểm tra các cột có thể chứa thông tin Video/Live của Shopee
+            loai_sp = str(row.get('Loại sản phẩm', '')).lower()
+            loai_hh = str(row.get('Loại Hoa hồng', '')).lower()
             
-            if 'video' in sub_id3:
-                return 'Video (SubID)'
-            elif 'live' in sub_id3:
-                return 'Live (SubID)'
+            # Shopee Video/Live thường có đánh dấu riêng trong Loại sản phẩm
+            if 'video' in loai_sp or 'video' in loai_hh:
+                return 'Shopee Video'
+            elif 'live' in loai_sp or 'live' in loai_hh or 'livestream' in loai_sp:
+                return 'Shopee Live'
             else:
-                return 'Social'
+                # Nếu không có video/live của Shopee, phân loại theo SubID
+                sub_id3 = str(row.get('Sub_id3', '')).lower().strip()
+                if 'video' in sub_id3:
+                    return 'Video (SubID)'
+                elif 'live' in sub_id3:
+                    return 'Live (SubID)'
+                else:
+                    return 'Normal'
             
         df['Phân loại nguồn'] = df.apply(classify_source, axis=1)
         df['Loại nội dung'] = df.apply(classify_content_type, axis=1)
@@ -162,7 +176,7 @@ if uploaded_file is not None:
 
         st.markdown("---")
 
-        # MỤC 1: THỐNG KÊ TỔNG QUAN
+        # MỤC 1: THỐNG KÊ TỔNG QUAN - SẮP XẾP LẠI
         st.header("1. Thống kê tổng quan")
         
         # TÍNH TOÁN
@@ -173,13 +187,22 @@ if uploaded_file is not None:
         hh_xtra = df_filtered['Hoa hồng Xtra trên sản phẩm(₫)'].sum()
         commission_rate = (total_comm/total_gmv*100 if total_gmv > 0 else 0)
         
-        # SỐ CLICK = SỐ CHECKOUT ID UNIQUE (1 checkout = 1 click vào link affiliate)
-        total_clicks = df_filtered['Checkout id'].nunique()
+        # TÍNH SỐ CLICK THEO NGÀY CLICK (không phải ngày đặt hàng)
+        # Lọc df gốc theo khoảng thời gian click
+        if date_range and len(date_range) == 2:
+            df_click_filtered = df[(df['Ngày Click'] >= date_range[0]) & (df['Ngày Click'] <= date_range[1])]
+        else:
+            df_click_filtered = df
+        total_clicks = df_click_filtered['Thời gian Click'].notna().sum()
+        
+        # Ghi chú: File CSV chỉ chứa dữ liệu đơn hàng, mỗi dòng = 1 click dẫn đến đơn hàng
+        # Nếu cần tổng số click từ Shopee dashboard (bao gồm click không chuyển đổi), 
+        # vui lòng kiểm tra báo cáo từ Shopee Affiliate Center
         
         total_quantity_sold = int(df_filtered['Số lượng'].sum())
         avg_commission_per_order = (total_comm/total_orders if total_orders > 0 else 0)
         
-        # Tính hoa hồng theo kênh - GỘP SOCIAL
+        # Tính hoa hồng theo kênh (Social vs Others)
         comm_by_channel = df_filtered.groupby(['ID đơn hàng', 'Phân loại nguồn'])['Tổng hoa hồng đơn hàng(₫)'].first().reset_index()
         comm_social = comm_by_channel[comm_by_channel['Phân loại nguồn'] == 'Social']['Tổng hoa hồng đơn hàng(₫)'].sum()
         comm_others = comm_by_channel[comm_by_channel['Phân loại nguồn'] == 'Others']['Tổng hoa hồng đơn hàng(₫)'].sum()
@@ -209,20 +232,15 @@ if uploaded_file is not None:
         # MỤC 2: THỐNG KÊ ĐƠN HÀNG
         st.header("2. Thống kê đơn hàng")
         
-        # Đếm đơn hàng unique theo kênh - GỘP SOCIAL
+        # Đếm đơn hàng unique theo kênh (Social vs Others)
         orders_by_channel = df_filtered.groupby('Phân loại nguồn')['ID đơn hàng'].nunique()
         orders_social = orders_by_channel.get('Social', 0)
         orders_others = orders_by_channel.get('Others', 0)
         
-        # Đếm đơn theo loại nội dung
+        # Đếm đơn theo loại nội dung (Shopee Video/Live)
         orders_by_content = df_filtered.groupby('Loại nội dung')['ID đơn hàng'].nunique()
-        orders_video_subid = orders_by_content.get('Video (SubID)', 0)
-        orders_live_subid = orders_by_content.get('Live (SubID)', 0)
-        orders_social_content = orders_by_content.get('Social', 0)
-        
-        # Shopee Video/Live = 0 (không có trong dữ liệu)
-        orders_shopee_video = 0
-        orders_shopee_live = 0
+        orders_shopee_video = orders_by_content.get('Shopee Video', 0)
+        orders_shopee_live = orders_by_content.get('Shopee Live', 0)
         
         # Đơn 0 đồng và đơn hủy
         orders_zero = df_filtered[df_filtered['Giá trị đơn hàng (₫)'] == 0]['ID đơn hàng'].nunique()
@@ -237,10 +255,8 @@ if uploaded_file is not None:
         c5.metric("🆓 Đơn 0 Đồng", f"{orders_zero:,}".replace(',', '.'))
         
         # DÒNG 2
-        c6, c7, c8 = st.columns(3)
-        c6.metric("🎥 Đơn Video (SubID)", f"{orders_video_subid:,}".replace(',', '.'))
-        c7.metric("📺 Đơn Live (SubID)", f"{orders_live_subid:,}".replace(',', '.'))
-        c8.metric("❌ Đơn Hủy", f"{orders_cancelled:,}".replace(',', '.'))
+        c6, c7 = st.columns(2)
+        c6.metric("❌ Đơn Hủy", f"{orders_cancelled:,}".replace(',', '.'))
 
         st.markdown("---")
 
@@ -261,24 +277,15 @@ if uploaded_file is not None:
             )
             st.plotly_chart(fig1, use_container_width=True)
             
-            # Biểu đồ tròn - Tỷ trọng đơn hàng theo kênh
-            # Tính toán lại từ đầu
-            channel_orders = df_filtered.groupby('Phân loại nguồn')['ID đơn hàng'].nunique().reset_index()
-            channel_orders.columns = ['Kênh', 'Số đơn']
-            
-            # Tính hoa hồng theo kênh
-            channel_comm = df_filtered.groupby(['ID đơn hàng', 'Phân loại nguồn'])['Tổng hoa hồng đơn hàng(₫)'].first().reset_index()
-            channel_comm_sum = channel_comm.groupby('Phân loại nguồn')['Tổng hoa hồng đơn hàng(₫)'].sum().reset_index()
-            channel_comm_sum.columns = ['Kênh', 'Hoa hồng']
-            
-            # Merge
-            channel_stats = channel_orders.merge(channel_comm_sum, on='Kênh')
+            # Biểu đồ tròn - Tỷ trọng đơn hàng theo kênh - SỬA HIỂN THỊ HOVER
+            channel_stats = df_filtered.groupby('Phân loại nguồn').agg(
+                Số_đơn=('ID đơn hàng', 'nunique'),
+                Hoa_hồng=('Tổng hoa hồng đơn hàng(₫)', 'sum')
+            ).reset_index()
+            channel_stats.columns = ['Kênh', 'Số đơn', 'Hoa hồng']
             channel_stats['Tỷ trọng'] = (channel_stats['Số đơn'] / channel_stats['Số đơn'].sum() * 100).round(2)
-            
-            # Format
-            channel_stats['Số_đơn_str'] = channel_stats['Số đơn'].apply(lambda x: f"{x:,}".replace(',', '.'))
-            channel_stats['Tỷ_trọng_str'] = channel_stats['Tỷ trọng'].apply(lambda x: f"{x:.2f}%")
-            channel_stats['Hoa_hồng_str'] = channel_stats['Hoa hồng'].apply(format_currency)
+            channel_stats['Hoa_hồng_formatted'] = channel_stats['Hoa hồng'].apply(format_currency)
+            channel_stats['Số_đơn_formatted'] = channel_stats['Số đơn'].apply(lambda x: f"{x:,}".replace(',', '.'))
             
             fig2 = px.pie(
                 channel_stats, 
@@ -286,14 +293,21 @@ if uploaded_file is not None:
                 values='Số đơn',
                 title="Tỷ trọng đơn hàng theo kênh"
             )
+            
+            # Tạo hover text riêng cho từng kênh
+            hover_texts = []
+            for idx, row in channel_stats.iterrows():
+                hover_text = f"<b>{row['Kênh']}</b><br>"
+                hover_text += f"Số đơn: {row['Số_đơn_formatted']}<br>"
+                hover_text += f"Tỷ trọng: {row['Tỷ trọng']:.2f}%<br>"
+                hover_text += f"Hoa hồng: {row['Hoa_hồng_formatted']}"
+                hover_texts.append(hover_text)
+            
             fig2.update_traces(
                 textposition='inside',
                 textinfo='percent+label',
-                hovertemplate="<b>%{label}</b><br>" +
-                             "Số đơn: %{customdata[0]}<br>" +
-                             "Tỷ trọng: %{customdata[1]}<br>" +
-                             "Hoa hồng: %{customdata[2]}<extra></extra>",
-                customdata=channel_stats[['Số_đơn_str', 'Tỷ_trọng_str', 'Hoa_hồng_str']]
+                hovertemplate='%{customdata}<extra></extra>',
+                customdata=hover_texts
             )
             st.plotly_chart(fig2, use_container_width=True)
 
