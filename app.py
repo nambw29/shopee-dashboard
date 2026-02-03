@@ -205,9 +205,9 @@ with col_date:
             max_date = df_temp['Ngày'].max()
             today = datetime.now().date()
             
-            # Dropdown cho các lựa chọn thời gian - THAY THẾ "Choose a date range"
+            # Dropdown cho các lựa chọn thời gian
             time_option = st.selectbox(
-                "",  # Không hiển thị label riêng
+                "",
                 ["Ngày cập nhật lần cuối", "7 ngày qua", "15 ngày qua", "30 ngày qua", 
                  "Tháng này", "Tháng trước", "Từ trước đến nay"],
                 label_visibility="collapsed"
@@ -240,13 +240,27 @@ with col_date:
                 default_start = min_date
                 default_end = max_date
             
-            # Bảng chọn ngày tháng (không hiển thị label)
-            date_range = st.date_input(
-                "", 
-                [default_start, default_end], 
-                format="DD/MM/YYYY",
-                label_visibility="collapsed"
-            )
+            # 2 ô chọn ngày riêng biệt (KHÔNG có popup "Choose a date range")
+            col_start, col_end = st.columns(2)
+            with col_start:
+                start_date = st.date_input(
+                    "Từ ngày:", 
+                    default_start, 
+                    format="DD/MM/YYYY",
+                    min_value=min_date,
+                    max_value=max_date
+                )
+            with col_end:
+                end_date = st.date_input(
+                    "Đến ngày:", 
+                    default_end, 
+                    format="DD/MM/YYYY",
+                    min_value=min_date,
+                    max_value=max_date
+                )
+            
+            # Tạo tuple để giữ format giống như trước
+            date_range = (start_date, end_date)
     else:
         st.info("Vui lòng tải lên file CSV")
         date_range = None
