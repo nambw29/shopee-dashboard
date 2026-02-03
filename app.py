@@ -157,12 +157,14 @@ with col_date:
             min_date = df_temp['Ngày'].min()
             max_date = df_temp['Ngày'].max()
             
+            # Thêm lựa chọn khoảng thời gian
             import datetime
             today = datetime.date.today()
+            yesterday = today - datetime.timedelta(days=1)
             
-            # Các lựa chọn khoảng thời gian
             time_range_options = {
                 "Ngày cập nhật lần cuối": (max_date, max_date),
+                "Ngày hôm qua": (yesterday, yesterday),
                 "7 ngày qua": (today - datetime.timedelta(days=7), today),
                 "15 ngày qua": (today - datetime.timedelta(days=15), today),
                 "30 ngày qua": (today - datetime.timedelta(days=30), today),
@@ -172,20 +174,37 @@ with col_date:
                     else datetime.date(today.year - 1, 12, 1),
                     (datetime.date(today.year, today.month, 1) - datetime.timedelta(days=1))
                 ),
-                "Từ trước đến nay": (min_date, max_date)
+                "3 tháng trước": (today - datetime.timedelta(days=90), today),
+                "Từ trước đến nay": (min_date, max_date),
+                "Tùy chọn khoảng thời gian": None
             }
             
             selected_range = st.selectbox(
                 "Lựa chọn:",
                 options=list(time_range_options.keys()),
-                index=0,  # Mặc định: Ngày cập nhật lần cuối
+                index=0,  # Mặc định là "Ngày cập nhật lần cuối"
                 label_visibility="collapsed"
             )
             
-            # Lấy khoảng thời gian
-            date_range = time_range_options[selected_range]
+            # Nếu chọn "Tùy chọn khoảng thời gian", hiển thị date picker
+            if selected_range == "Tùy chọn khoảng thời gian":
+                custom_range = st.date_input(
+                    "Chọn khoảng:",
+                    [min_date, max_date],
+                    min_value=min_date,
+                    max_value=max_date,
+                    format="DD/MM/YYYY",
+                    label_visibility="collapsed"
+                )
+                if len(custom_range) == 2:
+                    date_range = custom_range
+                else:
+                    date_range = (min_date, max_date)
+            else:
+                # Lấy khoảng thời gian tương ứng
+                date_range = time_range_options[selected_range]
             
-            # Hiển thị khoảng thời gian
+            # Hiển thị thông tin khoảng thời gian đã chọn
             if date_range:
                 st.info(f"📅 {date_range[0].strftime('%d/%m/%Y')} - {date_range[1].strftime('%d/%m/%Y')}")
     else:
@@ -197,7 +216,10 @@ if uploaded_file is not None:
     if df is not None:
         
         # Lọc theo thời gian
-        if date_range:
+        if date_range and len(date_range) == 2:
+            df_filtered = df[(df['Ngày'] >= date_range[0]) & (df['Ngày'] <= date_range[1])]
+        elif date_range:
+            # date_range là tuple với 2 phần tử
             df_filtered = df[(df['Ngày'] >= date_range[0]) & (df['Ngày'] <= date_range[1])]
         else:
             df_filtered = df
@@ -426,7 +448,7 @@ if uploaded_file is not None:
         product_stats['Tỉ lệ hoa hồng'] = (product_stats['Hoa_hồng'] / product_stats['GMV'] * 100).round(2)
         product_stats = product_stats.nlargest(10, 'Số_đơn').reset_index(drop=True)
         
-        # Tạo HTML table với link nhúng trong tên sản phẩm
+        # Tạo HTML table
         html_table = """
         <style>
             .product-table {
@@ -445,6 +467,9 @@ if uploaded_file is not None:
             .product-table td {
                 padding: 12px 15px;
                 border: 1px solid #ddd;
+            }
+            .product-table tbody tr {
+                border-bottom: 1px solid #ddd;
             }
             .product-table tbody tr:hover {
                 background-color: #f5f5f5;
@@ -512,7 +537,7 @@ if uploaded_file is not None:
         shop_stats['Tỉ lệ hoa hồng'] = (shop_stats['Hoa_hồng'] / shop_stats['GMV'] * 100).round(2)
         shop_stats = shop_stats.nlargest(10, 'Số_đơn').reset_index(drop=True)
         
-        # Tạo HTML table với link nhúng trong tên shop
+        # Tạo HTML table
         html_table = """
         <style>
             .shop-table {
@@ -531,6 +556,9 @@ if uploaded_file is not None:
             .shop-table td {
                 padding: 12px 15px;
                 border: 1px solid #ddd;
+            }
+            .shop-table tbody tr {
+                border-bottom: 1px solid #ddd;
             }
             .shop-table tbody tr:hover {
                 background-color: #f5f5f5;
