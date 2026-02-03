@@ -598,7 +598,7 @@ if uploaded_file is not None:
                     <td class="text-center">{idx + 1}</td>
                     <td><a href="{shop_link}" target="_blank">{row['Tên Shop']}</a></td>
                     <td class="text-right">{format_currency(row['GMV'])}</td>
-                    <td class="text-center">{row['Số_đơn']:,}".replace(',', '.')}</td>
+                    <td class="text-center">{row['Số_đơn']:,}".replace(',', '.')</td>
                     <td class="text-right">{format_currency(row['Hoa_hồng'])}</td>
                     <td class="text-center">{row['Tỉ lệ hoa hồng']:.2f}%</td>
                 </tr>
