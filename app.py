@@ -186,19 +186,6 @@ if uploaded_file is not None:
         hh_shopee = df_filtered['Hoa hồng Shopee trên sản phẩm(₫)'].sum()
         hh_xtra = df_filtered['Hoa hồng Xtra trên sản phẩm(₫)'].sum()
         commission_rate = (total_comm/total_gmv*100 if total_gmv > 0 else 0)
-        
-        # TÍNH SỐ CLICK THEO NGÀY CLICK (không phải ngày đặt hàng)
-        # Lọc df gốc theo khoảng thời gian click
-        if date_range and len(date_range) == 2:
-            df_click_filtered = df[(df['Ngày Click'] >= date_range[0]) & (df['Ngày Click'] <= date_range[1])]
-        else:
-            df_click_filtered = df
-        total_clicks = df_click_filtered['Thời gian Click'].notna().sum()
-        
-        # Ghi chú: File CSV chỉ chứa dữ liệu đơn hàng, mỗi dòng = 1 click dẫn đến đơn hàng
-        # Nếu cần tổng số click từ Shopee dashboard (bao gồm click không chuyển đổi), 
-        # vui lòng kiểm tra báo cáo từ Shopee Affiliate Center
-        
         total_quantity_sold = int(df_filtered['Số lượng'].sum())
         avg_commission_per_order = (total_comm/total_orders if total_orders > 0 else 0)
         
@@ -207,25 +194,24 @@ if uploaded_file is not None:
         comm_social = comm_by_channel[comm_by_channel['Phân loại nguồn'] == 'Social']['Tổng hoa hồng đơn hàng(₫)'].sum()
         comm_others = comm_by_channel[comm_by_channel['Phân loại nguồn'] == 'Others']['Tổng hoa hồng đơn hàng(₫)'].sum()
 
-        # DÒNG 1: Tổng Doanh Thu, Tổng Hoa Hồng, Tổng Đơn Hàng, Hoa Hồng Shopee, Hoa Hồng Xtra
-        col1, col2, col3, col4, col5 = st.columns(5)
+        # HÀNG 1: 4 cột
+        col1, col2, col3, col4 = st.columns(4)
         col1.metric("💰 Tổng Doanh Thu", format_currency(total_gmv))
         col2.metric("💵 Tổng Hoa Hồng", format_currency(total_comm))
         col3.metric("📦 Tổng Đơn Hàng", f"{total_orders:,}".replace(',', '.'))
         col4.metric("💎 Hoa Hồng Shopee", format_currency(hh_shopee))
+        
+        # HÀNG 2: 4 cột
+        col5, col6, col7, col8 = st.columns(4)
         col5.metric("⭐ Hoa Hồng Xtra", format_currency(hh_xtra))
-        
-        # DÒNG 2: Tỷ Lệ Hoa Hồng, Số Lượng Click, Số Lượng Đã Bán
-        col6, col7, col8 = st.columns(3)
         col6.metric("📊 Tỷ Lệ Hoa Hồng", f"{commission_rate:.2f}%")
-        col7.metric("👆 Số Lượng Click", f"{total_clicks:,}".replace(',', '.'))
-        col8.metric("🛒 Số Lượng Đã Bán", f"{total_quantity_sold:,}".replace(',', '.'))
+        col7.metric("🛒 Số Lượng Đã Bán", f"{total_quantity_sold:,}".replace(',', '.'))
+        col8.metric("📈 Hoa Hồng TB/Đơn", format_currency(avg_commission_per_order))
         
-        # DÒNG 3: HH TB/Đơn, HH Social, HH Others
-        col9, col10, col11 = st.columns(3)
-        col9.metric("📈 Hoa Hồng TB/Đơn", format_currency(avg_commission_per_order))
-        col10.metric("👥 Hoa Hồng Social", format_currency(comm_social))
-        col11.metric("📋 Hoa Hồng Others", format_currency(comm_others))
+        # HÀNG 3: 2 cột (Social và Others)
+        col9, col10 = st.columns(2)
+        col9.metric("👥 Hoa Hồng Social", format_currency(comm_social))
+        col10.metric("📋 Hoa Hồng Others", format_currency(comm_others))
 
         st.markdown("---")
 
@@ -239,23 +225,20 @@ if uploaded_file is not None:
         
         # Đếm đơn theo loại nội dung (Shopee Video/Live)
         orders_by_content = df_filtered.groupby('Loại nội dung')['ID đơn hàng'].nunique()
-        orders_shopee_video = orders_by_content.get('Shopee Video', 0)
-        orders_shopee_live = orders_by_content.get('Shopee Live', 0)
+        orders_video = orders_by_content.get('Shopee Video', 0)
+        orders_live = orders_by_content.get('Shopee Live', 0)
         
         # Đơn 0 đồng và đơn hủy
         orders_zero = df_filtered[df_filtered['Giá trị đơn hàng (₫)'] == 0]['ID đơn hàng'].nunique()
         orders_cancelled = df_filtered[df_filtered['Trạng thái đặt hàng'].str.contains('Hủy', case=False, na=False)]['ID đơn hàng'].nunique()
         
-        # DÒNG 1
-        c1, c2, c3, c4, c5 = st.columns(5)
+        # 1 HÀNG 6 CỘT
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
         c1.metric("👥 Đơn Social", f"{orders_social:,}".replace(',', '.'))
         c2.metric("📋 Đơn Others", f"{orders_others:,}".replace(',', '.'))
-        c3.metric("🎬 Đơn Shopee Video", f"{orders_shopee_video:,}".replace(',', '.'))
-        c4.metric("📹 Đơn Shopee Live", f"{orders_shopee_live:,}".replace(',', '.'))
+        c3.metric("🎬 Đơn Video", f"{orders_video:,}".replace(',', '.'))
+        c4.metric("📹 Đơn Live", f"{orders_live:,}".replace(',', '.'))
         c5.metric("🆓 Đơn 0 Đồng", f"{orders_zero:,}".replace(',', '.'))
-        
-        # DÒNG 2
-        c6, c7 = st.columns(2)
         c6.metric("❌ Đơn Hủy", f"{orders_cancelled:,}".replace(',', '.'))
 
         st.markdown("---")
@@ -408,7 +391,8 @@ if uploaded_file is not None:
         # MỤC 5: TOP 10 SẢN PHẨM NHIỀU ĐƠN NHẤT
         st.header("5. Top 10 sản phẩm nhiều đơn nhất")
         
-        product_stats = df_filtered.groupby('Tên Item').agg(
+        # Group by both Tên Item, Shop id và Item id để lấy link
+        product_stats = df_filtered.groupby(['Tên Item', 'Shop id', 'Item id']).agg(
             GMV=('Giá trị đơn hàng (₫)', 'sum'),
             Số_đơn=('ID đơn hàng', 'count'),
             Hoa_hồng=('Tổng hoa hồng đơn hàng(₫)', 'sum')
@@ -417,9 +401,16 @@ if uploaded_file is not None:
         product_stats['Tỉ lệ hoa hồng'] = (product_stats['Hoa_hồng'] / product_stats['GMV'] * 100).round(2)
         product_stats = product_stats.nlargest(10, 'Số_đơn').reset_index(drop=True)
         
+        # Tạo link sản phẩm
+        product_stats['Link'] = product_stats.apply(
+            lambda row: f"https://shopee.vn/product/{row['Shop id']}/{row['Item id']}", 
+            axis=1
+        )
+        
         top_products = pd.DataFrame({
             'STT': range(1, len(product_stats) + 1),
             'Tên sản phẩm': product_stats['Tên Item'],
+            'Link sản phẩm': product_stats['Link'],
             'Tổng GMV': product_stats['GMV'].apply(format_currency),
             'Số đơn': product_stats['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.')),
             'Hoa hồng': product_stats['Hoa_hồng'].apply(format_currency),
@@ -433,6 +424,7 @@ if uploaded_file is not None:
             column_config={
                 "STT": st.column_config.NumberColumn("STT", width="small"),
                 "Tên sản phẩm": st.column_config.TextColumn("Tên sản phẩm", width="large"),
+                "Link sản phẩm": st.column_config.LinkColumn("Link sản phẩm", width="medium"),
                 "Tổng GMV": st.column_config.TextColumn("Tổng GMV", width="medium"),
                 "Số đơn": st.column_config.TextColumn("Số đơn", width="small"),
                 "Hoa hồng": st.column_config.TextColumn("Hoa hồng", width="medium"),
@@ -446,7 +438,8 @@ if uploaded_file is not None:
         # MỤC 6: TOP 10 SHOP CÓ NHIỀU ĐƠN NHẤT
         st.header("6. Top 10 shop có nhiều đơn nhất")
         
-        shop_stats = df_filtered.groupby('Tên Shop').agg(
+        # Group by both Tên Shop và Shop id để lấy link
+        shop_stats = df_filtered.groupby(['Tên Shop', 'Shop id']).agg(
             GMV=('Giá trị đơn hàng (₫)', 'sum'),
             Số_đơn=('ID đơn hàng', 'nunique'),
             Hoa_hồng=('Tổng hoa hồng đơn hàng(₫)', 'sum')
@@ -455,9 +448,13 @@ if uploaded_file is not None:
         shop_stats['Tỉ lệ hoa hồng'] = (shop_stats['Hoa_hồng'] / shop_stats['GMV'] * 100).round(2)
         shop_stats = shop_stats.nlargest(10, 'Số_đơn').reset_index(drop=True)
         
+        # Tạo link shop
+        shop_stats['Link'] = shop_stats['Shop id'].apply(lambda x: f"https://shopee.vn/shop/{x}")
+        
         top_shops = pd.DataFrame({
             'STT': range(1, len(shop_stats) + 1),
             'Tên shop': shop_stats['Tên Shop'],
+            'Link shop': shop_stats['Link'],
             'Tổng GMV': shop_stats['GMV'].apply(format_currency),
             'Số đơn': shop_stats['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.')),
             'Hoa hồng': shop_stats['Hoa_hồng'].apply(format_currency),
@@ -471,6 +468,7 @@ if uploaded_file is not None:
             column_config={
                 "STT": st.column_config.NumberColumn("STT", width="small"),
                 "Tên shop": st.column_config.TextColumn("Tên shop", width="large"),
+                "Link shop": st.column_config.LinkColumn("Link shop", width="medium"),
                 "Tổng GMV": st.column_config.TextColumn("Tổng GMV", width="medium"),
                 "Số đơn": st.column_config.TextColumn("Số đơn", width="small"),
                 "Hoa hồng": st.column_config.TextColumn("Hoa hồng", width="medium"),
