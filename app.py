@@ -154,40 +154,12 @@ with col_date:
     if uploaded_file is not None:
         df_temp = load_data(uploaded_file)
         if df_temp is not None:
-            min_date = df_temp['Ngày'].min()
-            max_date = df_temp['Ngày'].max()
-            
-            import datetime
-            today = datetime.date.today()
-            
-            # Các lựa chọn khoảng thời gian
-            time_range_options = {
-                "Ngày cập nhật lần cuối": (max_date, max_date),
-                "7 ngày qua": (today - datetime.timedelta(days=7), today),
-                "15 ngày qua": (today - datetime.timedelta(days=15), today),
-                "30 ngày qua": (today - datetime.timedelta(days=30), today),
-                "Tháng này": (datetime.date(today.year, today.month, 1), today),
-                "Tháng trước": (
-                    datetime.date(today.year, today.month - 1 if today.month > 1 else 12, 1) if today.month > 1 
-                    else datetime.date(today.year - 1, 12, 1),
-                    (datetime.date(today.year, today.month, 1) - datetime.timedelta(days=1))
-                ),
-                "Từ trước đến nay": (min_date, max_date)
-            }
-            
-            selected_range = st.selectbox(
-                "Lựa chọn:",
-                options=list(time_range_options.keys()),
-                index=0,  # Mặc định: Ngày cập nhật lần cuối
+            date_range = st.date_input(
+                "Thời gian:", 
+                [df_temp['Ngày'].min(), df_temp['Ngày'].max()], 
+                format="DD/MM/YYYY",
                 label_visibility="collapsed"
             )
-            
-            # Lấy khoảng thời gian
-            date_range = time_range_options[selected_range]
-            
-            # Hiển thị khoảng thời gian
-            if date_range:
-                st.info(f"📅 {date_range[0].strftime('%d/%m/%Y')} - {date_range[1].strftime('%d/%m/%Y')}")
     else:
         st.info("Vui lòng tải lên file CSV")
         date_range = None
@@ -197,7 +169,7 @@ if uploaded_file is not None:
     if df is not None:
         
         # Lọc theo thời gian
-        if date_range:
+        if date_range and len(date_range) == 2:
             df_filtered = df[(df['Ngày'] >= date_range[0]) & (df['Ngày'] <= date_range[1])]
         else:
             df_filtered = df
@@ -222,19 +194,22 @@ if uploaded_file is not None:
         comm_social = comm_by_channel[comm_by_channel['Phân loại nguồn'] == 'Social']['Tổng hoa hồng đơn hàng(₫)'].sum()
         comm_others = comm_by_channel[comm_by_channel['Phân loại nguồn'] == 'Others']['Tổng hoa hồng đơn hàng(₫)'].sum()
 
-        # HÀNG 1: 5 cột
-        col1, col2, col3, col4, col5 = st.columns(5)
+        # HÀNG 1: 4 cột
+        col1, col2, col3, col4 = st.columns(4)
         col1.metric("💰 Tổng Doanh Thu", format_currency(total_gmv))
         col2.metric("💵 Tổng Hoa Hồng", format_currency(total_comm))
         col3.metric("📦 Tổng Đơn Hàng", f"{total_orders:,}".replace(',', '.'))
         col4.metric("💎 Hoa Hồng Shopee", format_currency(hh_shopee))
-        col5.metric("⭐ Hoa Hồng Xtra", format_currency(hh_xtra))
         
-        # HÀNG 2: 5 cột
-        col6, col7, col8, col9, col10 = st.columns(5)
+        # HÀNG 2: 4 cột
+        col5, col6, col7, col8 = st.columns(4)
+        col5.metric("⭐ Hoa Hồng Xtra", format_currency(hh_xtra))
         col6.metric("📊 Tỷ Lệ Hoa Hồng", f"{commission_rate:.2f}%")
         col7.metric("🛒 Số Lượng Đã Bán", f"{total_quantity_sold:,}".replace(',', '.'))
         col8.metric("📈 Hoa Hồng TB/Đơn", format_currency(avg_commission_per_order))
+        
+        # HÀNG 3: 2 cột (Social và Others)
+        col9, col10 = st.columns(2)
         col9.metric("👥 Hoa Hồng Social", format_currency(comm_social))
         col10.metric("📋 Hoa Hồng Others", format_currency(comm_others))
 
@@ -426,77 +401,37 @@ if uploaded_file is not None:
         product_stats['Tỉ lệ hoa hồng'] = (product_stats['Hoa_hồng'] / product_stats['GMV'] * 100).round(2)
         product_stats = product_stats.nlargest(10, 'Số_đơn').reset_index(drop=True)
         
-        # Tạo HTML table với link nhúng trong tên sản phẩm
-        html_table = """
-        <style>
-            .product-table {
-                width: 100%;
-                border-collapse: collapse;
-                margin: 20px 0;
-                font-size: 14px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-            .product-table thead tr {
-                background-color: #f0f2f6;
-                text-align: left;
-                font-weight: bold;
-            }
-            .product-table th,
-            .product-table td {
-                padding: 12px 15px;
-                border: 1px solid #ddd;
-            }
-            .product-table tbody tr:hover {
-                background-color: #f5f5f5;
-            }
-            .product-table a {
-                color: #0066cc;
-                text-decoration: none;
-            }
-            .product-table a:hover {
-                text-decoration: underline;
-            }
-            .text-center {
-                text-align: center;
-            }
-            .text-right {
-                text-align: right;
-            }
-        </style>
-        <table class="product-table">
-            <thead>
-                <tr>
-                    <th class="text-center">STT</th>
-                    <th>Tên sản phẩm</th>
-                    <th class="text-right">Tổng GMV</th>
-                    <th class="text-center">Số đơn</th>
-                    <th class="text-right">Hoa hồng</th>
-                    <th class="text-center">Tỉ lệ HH</th>
-                </tr>
-            </thead>
-            <tbody>
-        """
+        # Tạo link sản phẩm
+        product_stats['Link'] = product_stats.apply(
+            lambda row: f"https://shopee.vn/product/{row['Shop id']}/{row['Item id']}", 
+            axis=1
+        )
         
-        for idx, row in product_stats.iterrows():
-            product_link = f"https://shopee.vn/product/{row['Shop id']}/{row['Item id']}"
-            so_don_formatted = f"{row['Số_đơn']:,}".replace(',', '.')
-            html_table += f"""
-                <tr>
-                    <td class="text-center">{idx + 1}</td>
-                    <td><a href="{product_link}" target="_blank">{row['Tên Item']}</a></td>
-                    <td class="text-right">{format_currency(row['GMV'])}</td>
-                    <td class="text-center">{so_don_formatted}</td>
-                    <td class="text-right">{format_currency(row['Hoa_hồng'])}</td>
-                    <td class="text-center">{row['Tỉ lệ hoa hồng']:.2f}%</td>
-                </tr>
-            """
+        top_products = pd.DataFrame({
+            'STT': range(1, len(product_stats) + 1),
+            'Tên sản phẩm': product_stats['Tên Item'],
+            'Link sản phẩm': product_stats['Link'],
+            'Tổng GMV': product_stats['GMV'].apply(format_currency),
+            'Số đơn': product_stats['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.')),
+            'Hoa hồng': product_stats['Hoa_hồng'].apply(format_currency),
+            'Tỉ lệ hoa hồng': product_stats['Tỉ lệ hoa hồng'].apply(lambda x: f"{x:.2f}%")
+        })
         
-        html_table += """
-            </tbody>
-        </table>
-        """
-        
-        st.markdown(html_table, unsafe_allow_html=True)
+        st.dataframe(
+            top_products,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "STT": st.column_config.NumberColumn("STT", width="small"),
+                "Tên sản phẩm": st.column_config.TextColumn("Tên sản phẩm", width="large"),
+                "Link sản phẩm": st.column_config.LinkColumn("Link sản phẩm", width="medium"),
+                "Tổng GMV": st.column_config.TextColumn("Tổng GMV", width="medium"),
+                "Số đơn": st.column_config.TextColumn("Số đơn", width="small"),
+                "Hoa hồng": st.column_config.TextColumn("Hoa hồng", width="medium"),
+                "Tỉ lệ hoa hồng": st.column_config.TextColumn("Tỉ lệ hoa hồng", width="small"),
+            },
+            height=400
+        )
 
         st.markdown("---")
         
@@ -513,77 +448,34 @@ if uploaded_file is not None:
         shop_stats['Tỉ lệ hoa hồng'] = (shop_stats['Hoa_hồng'] / shop_stats['GMV'] * 100).round(2)
         shop_stats = shop_stats.nlargest(10, 'Số_đơn').reset_index(drop=True)
         
-        # Tạo HTML table với link nhúng trong tên shop
-        html_table = """
-        <style>
-            .shop-table {
-                width: 100%;
-                border-collapse: collapse;
-                margin: 20px 0;
-                font-size: 14px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-            .shop-table thead tr {
-                background-color: #f0f2f6;
-                text-align: left;
-                font-weight: bold;
-            }
-            .shop-table th,
-            .shop-table td {
-                padding: 12px 15px;
-                border: 1px solid #ddd;
-            }
-            .shop-table tbody tr:hover {
-                background-color: #f5f5f5;
-            }
-            .shop-table a {
-                color: #0066cc;
-                text-decoration: none;
-            }
-            .shop-table a:hover {
-                text-decoration: underline;
-            }
-            .text-center {
-                text-align: center;
-            }
-            .text-right {
-                text-align: right;
-            }
-        </style>
-        <table class="shop-table">
-            <thead>
-                <tr>
-                    <th class="text-center">STT</th>
-                    <th>Tên shop</th>
-                    <th class="text-right">Tổng GMV</th>
-                    <th class="text-center">Số đơn</th>
-                    <th class="text-right">Hoa hồng</th>
-                    <th class="text-center">Tỉ lệ HH</th>
-                </tr>
-            </thead>
-            <tbody>
-        """
+        # Tạo link shop
+        shop_stats['Link'] = shop_stats['Shop id'].apply(lambda x: f"https://shopee.vn/shop/{x}")
         
-        for idx, row in shop_stats.iterrows():
-            shop_link = f"https://shopee.vn/shop/{row['Shop id']}"
-            so_don_formatted = f"{row['Số_đơn']:,}".replace(',', '.')
-            html_table += f"""
-                <tr>
-                    <td class="text-center">{idx + 1}</td>
-                    <td><a href="{shop_link}" target="_blank">{row['Tên Shop']}</a></td>
-                    <td class="text-right">{format_currency(row['GMV'])}</td>
-                    <td class="text-center">{so_don_formatted}</td>
-                    <td class="text-right">{format_currency(row['Hoa_hồng'])}</td>
-                    <td class="text-center">{row['Tỉ lệ hoa hồng']:.2f}%</td>
-                </tr>
-            """
+        top_shops = pd.DataFrame({
+            'STT': range(1, len(shop_stats) + 1),
+            'Tên shop': shop_stats['Tên Shop'],
+            'Link shop': shop_stats['Link'],
+            'Tổng GMV': shop_stats['GMV'].apply(format_currency),
+            'Số đơn': shop_stats['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.')),
+            'Hoa hồng': shop_stats['Hoa_hồng'].apply(format_currency),
+            'Tỉ lệ hoa hồng': shop_stats['Tỉ lệ hoa hồng'].apply(lambda x: f"{x:.2f}%")
+        })
         
-        html_table += """
-            </tbody>
-        </table>
-        """
-        
-        st.markdown(html_table, unsafe_allow_html=True)
+        st.dataframe(
+            top_shops,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "STT": st.column_config.NumberColumn("STT", width="small"),
+                "Tên shop": st.column_config.TextColumn("Tên shop", width="large"),
+                "Link shop": st.column_config.LinkColumn("Link shop", width="medium"),
+                "Tổng GMV": st.column_config.TextColumn("Tổng GMV", width="medium"),
+                "Số đơn": st.column_config.TextColumn("Số đơn", width="small"),
+                "Hoa hồng": st.column_config.TextColumn("Hoa hồng", width="medium"),
+                "Tỉ lệ hoa hồng": st.column_config.TextColumn("Tỉ lệ hoa hồng", width="small"),
+            },
+            height=400
+        )
 
         st.markdown("---")
         
