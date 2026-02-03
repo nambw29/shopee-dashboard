@@ -414,59 +414,73 @@ if uploaded_file is not None:
 
         st.markdown("---")
         
-        # 6. TOP 10 SHOP CÓ NHIỀU ĐƠN NHẤT (sửa bằng LinkColumn)
-        st.header("6. Top 10 shop có nhiều đơn nhất")
-        
-        shop_stats = df_filtered.groupby(['Tên Shop', 'Shop id']).agg(
-            GMV=('Giá trị đơn hàng (₫)', 'sum'),
-            Số_đơn=('ID đơn hàng', 'nunique'),
-            Hoa_hồng=('Tổng hoa hồng đơn hàng(₫)', 'sum')
-        ).reset_index()
-        
-        shop_stats['Tỉ lệ hoa hồng'] = (shop_stats['Hoa_hồng'] / shop_stats['GMV'] * 100).round(2)
-        shop_stats = shop_stats.nlargest(10, 'Số_đơn').reset_index(drop=True)
-        
-        if not shop_stats.empty:
-            shop_stats['Link shop'] = shop_stats['Shop id'].apply(lambda x: f"https://shopee.vn/shop/{x}")
-            
-            display_cols_shop = {
-                'Tên Shop': 'Tên shop',
-                'Link shop': 'Link',
-                'GMV': 'Tổng GMV',
-                'Số_đơn': 'Số đơn',
-                'Hoa_hồng': 'Hoa hồng',
-                'Tỉ lệ hoa hồng': 'Tỉ lệ HH (%)'
-            }
-            
-            display_df_shop = shop_stats.rename(columns=display_cols_shop)[list(display_cols_shop.values())]
-            
-            display_df_shop['Tổng GMV'] = display_df_shop['Tổng GMV'].apply(format_currency)
-            display_df_shop['Hoa hồng'] = display_df_shop['Hoa hồng'].apply(format_currency)
-            display_df_shop['Số đơn'] = display_df_shop['Số đơn'].apply(lambda x: f"{x:,}".replace(',', '.'))
-            
-            st.dataframe(
-                display_df_shop,
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "Tên shop": st.column_config.TextColumn("Tên shop"),
-                    "Link": st.column_config.LinkColumn(
-                        "Link",
-                        display_text="Xem shop",
-                        help="Nhấn để mở trang shop trên Shopee",
-                        width="medium"
-                    ),
-                    "Tổng GMV": st.column_config.TextColumn("Tổng GMV", width="small"),
-                    "Số đơn": st.column_config.TextColumn("Số đơn", width="small"),
-                    "Hoa hồng": st.column_config.TextColumn("Hoa hồng", width="small"),
-                    "Tỉ lệ HH (%)": st.column_config.NumberColumn("Tỉ lệ HH (%)", format="%.2f", width="small"),
-                },
-                height=450
-            )
-        else:
-            st.info("Không có dữ liệu shop trong khoảng thời gian đã chọn.")
+# 6. TOP 10 SHOP CÓ NHIỀU ĐƠN NHẤT
+st.header("6. Top 10 shop có nhiều đơn nhất")
 
-        st.markdown("---")
+shop_stats = df_filtered.groupby(['Tên Shop', 'Shop id']).agg(
+    GMV=('Giá trị đơn hàng (₫)', 'sum'),
+    Số_đơn=('ID đơn hàng', 'nunique'),
+    Hoa_hồng=('Tổng hoa hồng đơn hàng(₫)', 'sum')
+).reset_index()
+
+shop_stats['Tỉ lệ hoa hồng'] = (shop_stats['Hoa_hồng'] / shop_stats['GMV'] * 100).round(2)
+shop_stats = shop_stats.nlargest(10, 'Số_đơn').reset_index(drop=True)
+
+if not shop_stats.empty:
+    # Tạo cột link shop
+    shop_stats['Link shop'] = shop_stats['Shop id'].apply(lambda x: f"https://shopee.vn/shop/{x}")
+
+    # Chuẩn bị dataframe hiển thị
+    display_cols = {
+        'Tên Shop': 'Tên shop',
+        'Link shop': 'Link',
+        'GMV': 'Tổng GMV',
+        'Số_đơn': 'Số đơn',
+        'Hoa_hồng': 'Hoa hồng',
+        'Tỉ lệ hoa hồng': 'Tỉ lệ HH (%)'
+    }
+
+    display_df = shop_stats.rename(columns=display_cols)[list(display_cols.values())]
+
+    # Format số đẹp
+    display_df['Tổng GMV'] = display_df['Tổng GMV'].apply(format_currency)
+    display_df['Hoa hồng'] = display_df['Hoa hồng'].apply(format_currency)
+    display_df['Số đơn'] = display_df['Số đơn'].apply(lambda x: f"{x:,}".replace(',', '.'))
+
+    # Hiển thị bảng với link clickable
+    st.dataframe(
+        display_df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Tên shop": st.column_config.TextColumn(
+                "Tên shop",
+                help="Tên cửa hàng trên Shopee",
+                width="large"
+            ),
+            "Link": st.column_config.LinkColumn(
+                "Link",
+                display_text="Mở shop",
+                help="Nhấn để xem trang shop trên Shopee (mở tab mới)",
+                width="medium"
+            ),
+            "Tổng GMV": st.column_config.TextColumn("Tổng GMV", width="small"),
+            "Số đơn": st.column_config.TextColumn("Số đơn", width="small"),
+            "Hoa hồng": st.column_config.TextColumn("Hoa hồng", width="small"),
+            "Tỉ lệ HH (%)": st.column_config.NumberColumn(
+                "Tỉ lệ HH (%)",
+                format="%.2f",
+                width="small"
+            ),
+        },
+        height=500  # Tăng chiều cao để dễ xem hơn nếu có 10 dòng
+    )
+
+    # Hiển thị thêm thông tin tổng quan ngắn gọn
+    total_shops = len(shop_stats)
+    st.caption(f"Hiển thị top {total_shops} shop có số đơn cao nhất trong khoảng thời gian đã chọn.")
+else:
+    st.info("Không có dữ liệu shop nào trong khoảng thời gian đã chọn.")
         
         # 7. CHI TIẾT ĐƠN HÀNG
         st.header("7. Chi tiết đơn hàng")
