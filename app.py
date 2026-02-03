@@ -175,38 +175,20 @@ with col_date:
                     (datetime.date(today.year, today.month, 1) - datetime.timedelta(days=1))
                 ),
                 "3 tháng trước": (today - datetime.timedelta(days=90), today),
-                "Từ trước đến nay": (min_date, max_date),
-                "Tùy chọn khoảng thời gian": None
+                "Từ trước đến nay": (min_date, max_date)
             }
             
             selected_range = st.selectbox(
-                "Lựa chọn:",
+                "Chọn khoảng thời gian:",
                 options=list(time_range_options.keys()),
-                index=0,  # Mặc định là "Ngày cập nhật lần cuối"
-                label_visibility="collapsed"
+                index=0  # Mặc định là "Ngày cập nhật lần cuối"
             )
             
-            # Nếu chọn "Tùy chọn khoảng thời gian", hiển thị date picker
-            if selected_range == "Tùy chọn khoảng thời gian":
-                custom_range = st.date_input(
-                    "Chọn khoảng:",
-                    [min_date, max_date],
-                    min_value=min_date,
-                    max_value=max_date,
-                    format="DD/MM/YYYY",
-                    label_visibility="collapsed"
-                )
-                if len(custom_range) == 2:
-                    date_range = custom_range
-                else:
-                    date_range = (min_date, max_date)
-            else:
-                # Lấy khoảng thời gian tương ứng
-                date_range = time_range_options[selected_range]
+            # Lấy khoảng thời gian tương ứng
+            date_range = time_range_options[selected_range]
             
             # Hiển thị thông tin khoảng thời gian đã chọn
-            if date_range:
-                st.info(f"📅 {date_range[0].strftime('%d/%m/%Y')} - {date_range[1].strftime('%d/%m/%Y')}")
+            st.info(f"📅 Từ {date_range[0].strftime('%d/%m/%Y')} đến {date_range[1].strftime('%d/%m/%Y')}")
     else:
         st.info("Vui lòng tải lên file CSV")
         date_range = None
@@ -448,79 +430,25 @@ if uploaded_file is not None:
         product_stats['Tỉ lệ hoa hồng'] = (product_stats['Hoa_hồng'] / product_stats['GMV'] * 100).round(2)
         product_stats = product_stats.nlargest(10, 'Số_đơn').reset_index(drop=True)
         
-        # Tạo HTML table
-        html_table = """
-        <style>
-            .product-table {
-                width: 100%;
-                border-collapse: collapse;
-                margin: 20px 0;
-                font-size: 14px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-            .product-table thead tr {
-                background-color: #f0f2f6;
-                text-align: left;
-                font-weight: bold;
-            }
-            .product-table th,
-            .product-table td {
-                padding: 12px 15px;
-                border: 1px solid #ddd;
-            }
-            .product-table tbody tr {
-                border-bottom: 1px solid #ddd;
-            }
-            .product-table tbody tr:hover {
-                background-color: #f5f5f5;
-            }
-            .product-table a {
-                color: #0066cc;
-                text-decoration: none;
-            }
-            .product-table a:hover {
-                text-decoration: underline;
-            }
-            .text-center {
-                text-align: center;
-            }
-            .text-right {
-                text-align: right;
-            }
-        </style>
-        <table class="product-table">
-            <thead>
-                <tr>
-                    <th class="text-center">STT</th>
-                    <th>Tên sản phẩm</th>
-                    <th class="text-right">Tổng GMV</th>
-                    <th class="text-center">Số đơn</th>
-                    <th class="text-right">Hoa hồng</th>
-                    <th class="text-center">Tỉ lệ HH</th>
-                </tr>
-            </thead>
-            <tbody>
-        """
+        # Tạo markdown link cho sản phẩm
+        product_stats['Tên sản phẩm link'] = product_stats.apply(
+            lambda row: f"[{row['Tên Item']}](https://shopee.vn/product/{row['Shop id']}/{row['Item id']})", 
+            axis=1
+        )
+        
+        # Hiển thị bảng với markdown
+        st.markdown("| STT | Tên sản phẩm | Tổng GMV | Số đơn | Hoa hồng | Tỉ lệ HH |")
+        st.markdown("|-----|--------------|----------|--------|----------|----------|")
         
         for idx, row in product_stats.iterrows():
-            product_link = f"https://shopee.vn/product/{row['Shop id']}/{row['Item id']}"
-            html_table += f"""
-                <tr>
-                    <td class="text-center">{idx + 1}</td>
-                    <td><a href="{product_link}" target="_blank">{row['Tên Item']}</a></td>
-                    <td class="text-right">{format_currency(row['GMV'])}</td>
-                    <td class="text-center">{row['Số_đơn']:,}".replace(',', '.')}</td>
-                    <td class="text-right">{format_currency(row['Hoa_hồng'])}</td>
-                    <td class="text-center">{row['Tỉ lệ hoa hồng']:.2f}%</td>
-                </tr>
-            """
-        
-        html_table += """
-            </tbody>
-        </table>
-        """
-        
-        st.markdown(html_table, unsafe_allow_html=True)
+            st.markdown(
+                f"| {idx + 1} | {row['Tên sản phẩm link']} | "
+                f"{format_currency(row['GMV'])} | "
+                f"{row['Số_đơn']:,}".replace(',', '.') + " | "
+                f"{format_currency(row['Hoa_hồng'])} | "
+                f"{row['Tỉ lệ hoa hồng']:.2f}% |",
+                unsafe_allow_html=True
+            )
 
         st.markdown("---")
         
@@ -537,79 +465,25 @@ if uploaded_file is not None:
         shop_stats['Tỉ lệ hoa hồng'] = (shop_stats['Hoa_hồng'] / shop_stats['GMV'] * 100).round(2)
         shop_stats = shop_stats.nlargest(10, 'Số_đơn').reset_index(drop=True)
         
-        # Tạo HTML table
-        html_table = """
-        <style>
-            .shop-table {
-                width: 100%;
-                border-collapse: collapse;
-                margin: 20px 0;
-                font-size: 14px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-            .shop-table thead tr {
-                background-color: #f0f2f6;
-                text-align: left;
-                font-weight: bold;
-            }
-            .shop-table th,
-            .shop-table td {
-                padding: 12px 15px;
-                border: 1px solid #ddd;
-            }
-            .shop-table tbody tr {
-                border-bottom: 1px solid #ddd;
-            }
-            .shop-table tbody tr:hover {
-                background-color: #f5f5f5;
-            }
-            .shop-table a {
-                color: #0066cc;
-                text-decoration: none;
-            }
-            .shop-table a:hover {
-                text-decoration: underline;
-            }
-            .text-center {
-                text-align: center;
-            }
-            .text-right {
-                text-align: right;
-            }
-        </style>
-        <table class="shop-table">
-            <thead>
-                <tr>
-                    <th class="text-center">STT</th>
-                    <th>Tên shop</th>
-                    <th class="text-right">Tổng GMV</th>
-                    <th class="text-center">Số đơn</th>
-                    <th class="text-right">Hoa hồng</th>
-                    <th class="text-center">Tỉ lệ HH</th>
-                </tr>
-            </thead>
-            <tbody>
-        """
+        # Tạo markdown link cho shop
+        shop_stats['Tên shop link'] = shop_stats.apply(
+            lambda row: f"[{row['Tên Shop']}](https://shopee.vn/shop/{row['Shop id']})", 
+            axis=1
+        )
+        
+        # Hiển thị bảng với markdown
+        st.markdown("| STT | Tên shop | Tổng GMV | Số đơn | Hoa hồng | Tỉ lệ HH |")
+        st.markdown("|-----|----------|----------|--------|----------|----------|")
         
         for idx, row in shop_stats.iterrows():
-            shop_link = f"https://shopee.vn/shop/{row['Shop id']}"
-            html_table += f"""
-                <tr>
-                    <td class="text-center">{idx + 1}</td>
-                    <td><a href="{shop_link}" target="_blank">{row['Tên Shop']}</a></td>
-                    <td class="text-right">{format_currency(row['GMV'])}</td>
-                    <td class="text-center">{row['Số_đơn']:,}".replace(',', '.')}</td>
-                    <td class="text-right">{format_currency(row['Hoa_hồng'])}</td>
-                    <td class="text-center">{row['Tỉ lệ hoa hồng']:.2f}%</td>
-                </tr>
-            """
-        
-        html_table += """
-            </tbody>
-        </table>
-        """
-        
-        st.markdown(html_table, unsafe_allow_html=True)
+            st.markdown(
+                f"| {idx + 1} | {row['Tên shop link']} | "
+                f"{format_currency(row['GMV'])} | "
+                f"{row['Số_đơn']:,}".replace(',', '.') + " | "
+                f"{format_currency(row['Hoa_hồng'])} | "
+                f"{row['Tỉ lệ hoa hồng']:.2f}% |",
+                unsafe_allow_html=True
+            )
 
         st.markdown("---")
         
