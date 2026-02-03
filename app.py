@@ -479,12 +479,13 @@ if uploaded_file is not None:
         
         for idx, row in product_stats.iterrows():
             product_link = f"https://shopee.vn/product/{row['Shop id']}/{row['Item id']}"
+            so_don_formatted = f"{row['Số_đơn']:,}".replace(',', '.')
             html_table += f"""
                 <tr>
                     <td class="text-center">{idx + 1}</td>
                     <td><a href="{product_link}" target="_blank">{row['Tên Item']}</a></td>
                     <td class="text-right">{format_currency(row['GMV'])}</td>
-                    <td class="text-center">{row['Số_đơn']:,}".replace(',', '.')}</td>
+                    <td class="text-center">{so_don_formatted}</td>
                     <td class="text-right">{format_currency(row['Hoa_hồng'])}</td>
                     <td class="text-center">{row['Tỉ lệ hoa hồng']:.2f}%</td>
                 </tr>
@@ -565,12 +566,13 @@ if uploaded_file is not None:
         
         for idx, row in shop_stats.iterrows():
             shop_link = f"https://shopee.vn/shop/{row['Shop id']}"
+            so_don_formatted = f"{row['Số_đơn']:,}".replace(',', '.')
             html_table += f"""
                 <tr>
                     <td class="text-center">{idx + 1}</td>
                     <td><a href="{shop_link}" target="_blank">{row['Tên Shop']}</a></td>
                     <td class="text-right">{format_currency(row['GMV'])}</td>
-                    <td class="text-center">{row['Số_đơn']:,}".replace(',', '.')}</td>
+                    <td class="text-center">{so_don_formatted}</td>
                     <td class="text-right">{format_currency(row['Hoa_hồng'])}</td>
                     <td class="text-center">{row['Tỉ lệ hoa hồng']:.2f}%</td>
                 </tr>
