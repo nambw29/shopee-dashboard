@@ -406,7 +406,7 @@ if uploaded_file is not None:
         
         top_products = pd.DataFrame({
             'STT': range(1, len(product_stats) + 1),
-            'Tên sản phẩm': product_stats['Link'],  # Đưa link vào cột Tên sản phẩm
+            'Tên sản phẩm': product_stats['Link'],  # Đưa link vào cột
             'Tổng GMV': product_stats['GMV'].apply(format_currency),
             'Số đơn': product_stats['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.')),
             'Hoa hồng': product_stats['Hoa_hồng'].apply(format_currency),
@@ -419,7 +419,11 @@ if uploaded_file is not None:
             hide_index=True,
             column_config={
                 "STT": st.column_config.NumberColumn("STT", width="small"),
-                "Tên sản phẩm": st.column_config.LinkColumn("Tên sản phẩm", width="large"),  # Đổi thành LinkColumn
+                "Tên sản phẩm": st.column_config.LinkColumn(
+                    "Tên sản phẩm", 
+                    display_text=product_stats['Tên Item'].tolist(),  # Hiển thị tên sản phẩm
+                    width="large"
+                ),
                 "Tổng GMV": st.column_config.TextColumn("Tổng GMV", width="medium"),
                 "Số đơn": st.column_config.TextColumn("Số đơn", width="small"),
                 "Hoa hồng": st.column_config.TextColumn("Hoa hồng", width="medium"),
@@ -448,7 +452,7 @@ if uploaded_file is not None:
         
         top_shops = pd.DataFrame({
             'STT': range(1, len(shop_stats) + 1),
-            'Tên shop': shop_stats['Link'],  # Đưa link vào cột Tên shop
+            'Tên shop': shop_stats['Link'],  # Đưa link vào cột
             'Tổng GMV': shop_stats['GMV'].apply(format_currency),
             'Số đơn': shop_stats['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.')),
             'Hoa hồng': shop_stats['Hoa_hồng'].apply(format_currency),
@@ -461,7 +465,11 @@ if uploaded_file is not None:
             hide_index=True,
             column_config={
                 "STT": st.column_config.NumberColumn("STT", width="small"),
-                "Tên shop": st.column_config.LinkColumn("Tên shop", width="large"),  # Đổi thành LinkColumn
+                "Tên shop": st.column_config.LinkColumn(
+                    "Tên shop",
+                    display_text=shop_stats['Tên Shop'].tolist(),  # Hiển thị tên shop
+                    width="large"
+                ),
                 "Tổng GMV": st.column_config.TextColumn("Tổng GMV", width="medium"),
                 "Số đơn": st.column_config.TextColumn("Số đơn", width="small"),
                 "Hoa hồng": st.column_config.TextColumn("Hoa hồng", width="medium"),
