@@ -15,7 +15,7 @@ except:
     except:
         pass  # Sử dụng locale mặc định nếu không set được
 
-# --- CSS để Việt hóa và tùy chỉnh vùng tải tệp ---
+# --- CSS và JavaScript để Việt hóa và tùy chỉnh ---
 st.markdown("""
     <style>
     [data-testid="stFileUploaderDropzoneInstructions"] > div > span {
@@ -36,29 +36,6 @@ st.markdown("""
         display: none !important;
     }
     
-    /* Ẩn text "Choose a date range" trong popup calendar */
-    [data-baseweb="popover"] h4 {
-        display: none !important;
-    }
-    
-    [data-baseweb="popover"] [role="heading"] {
-        display: none !important;
-    }
-    
-    /* Ẩn tất cả heading trong date picker popup */
-    div[data-baseweb="calendar"] ~ div h4 {
-        display: none !important;
-    }
-    
-    /* Target text "Choose a date range" trực tiếp */
-    [data-baseweb="popover"] div:not([data-baseweb]) h4:first-child {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-    }
-    
     /* Style cho bảng dataframe */
     .stDataFrame {
         font-size: 14px;
@@ -74,6 +51,50 @@ st.markdown("""
         padding: 10px 8px !important;
     }
     </style>
+    
+    <script>
+    // Xóa text "Choose a date range" khi popup xuất hiện
+    function hideChooseDateRange() {
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                // Tìm tất cả h4 elements
+                const h4Elements = document.querySelectorAll('h4');
+                h4Elements.forEach(function(h4) {
+                    if (h4.textContent.includes('Choose a date range')) {
+                        h4.style.display = 'none';
+                        h4.style.visibility = 'hidden';
+                        h4.style.height = '0';
+                        h4.style.margin = '0';
+                        h4.style.padding = '0';
+                    }
+                });
+                
+                // Tìm trong popover
+                const popovers = document.querySelectorAll('[data-baseweb="popover"]');
+                popovers.forEach(function(popover) {
+                    const h4s = popover.querySelectorAll('h4');
+                    h4s.forEach(function(h4) {
+                        if (h4.textContent.includes('Choose a date range')) {
+                            h4.remove();
+                        }
+                    });
+                });
+            });
+        });
+        
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
+    
+    // Chạy khi trang load
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', hideChooseDateRange);
+    } else {
+        hideChooseDateRange();
+    }
+    </script>
     """, unsafe_allow_html=True)
 
 # --- HÀM FORMAT SỐ TIỀN ---
