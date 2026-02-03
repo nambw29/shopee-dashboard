@@ -161,12 +161,12 @@ with col_date:
             max_date = df_temp['Ngày'].max()
             today = datetime.now().date()
             
-            # Dropdown cho các lựa chọn thời gian
+            # Dropdown cho các lựa chọn thời gian - THAY THẾ "Choose a date range"
             time_option = st.selectbox(
-                "Chọn khoảng thời gian:",
+                "",  # Không hiển thị label riêng
                 ["Ngày cập nhật lần cuối", "7 ngày qua", "15 ngày qua", "30 ngày qua", 
                  "Tháng này", "Tháng trước", "Từ trước đến nay"],
-                label_visibility="visible"
+                label_visibility="collapsed"
             )
             
             # Tính toán khoảng thời gian dựa trên lựa chọn
@@ -196,12 +196,12 @@ with col_date:
                 default_start = min_date
                 default_end = max_date
             
-            # Bảng chọn ngày tháng (vẫn giữ nguyên)
+            # Bảng chọn ngày tháng (không hiển thị label)
             date_range = st.date_input(
-                "Hoặc chọn ngày cụ thể:", 
+                "", 
                 [default_start, default_end], 
                 format="DD/MM/YYYY",
-                label_visibility="visible"
+                label_visibility="collapsed"
             )
     else:
         st.info("Vui lòng tải lên file CSV")
