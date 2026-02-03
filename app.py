@@ -398,15 +398,15 @@ if uploaded_file is not None:
         product_stats['Tỉ lệ hoa hồng'] = (product_stats['Hoa_hồng'] / product_stats['GMV'] * 100).round(2)
         product_stats = product_stats.nlargest(10, 'Số_đơn').reset_index(drop=True)
         
-        # Tạo link sản phẩm
-        product_stats['Link'] = product_stats.apply(
-            lambda row: f"https://shopee.vn/product/{row['Shop id']}/{row['Item id']}", 
+        # Tạo link sản phẩm với markdown
+        product_stats['Tên có link'] = product_stats.apply(
+            lambda row: f"[{row['Tên Item']}](https://shopee.vn/product/{row['Shop id']}/{row['Item id']})", 
             axis=1
         )
         
         top_products = pd.DataFrame({
             'STT': range(1, len(product_stats) + 1),
-            'Tên sản phẩm': product_stats['Link'],  # Đưa link vào cột
+            'Tên sản phẩm': product_stats['Tên có link'],
             'Tổng GMV': product_stats['GMV'].apply(format_currency),
             'Số đơn': product_stats['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.')),
             'Hoa hồng': product_stats['Hoa_hồng'].apply(format_currency),
@@ -419,11 +419,7 @@ if uploaded_file is not None:
             hide_index=True,
             column_config={
                 "STT": st.column_config.NumberColumn("STT", width="small"),
-                "Tên sản phẩm": st.column_config.LinkColumn(
-                    "Tên sản phẩm", 
-                    display_text=product_stats['Tên Item'].tolist(),  # Hiển thị tên sản phẩm
-                    width="large"
-                ),
+                "Tên sản phẩm": st.column_config.TextColumn("Tên sản phẩm", width="large"),
                 "Tổng GMV": st.column_config.TextColumn("Tổng GMV", width="medium"),
                 "Số đơn": st.column_config.TextColumn("Số đơn", width="small"),
                 "Hoa hồng": st.column_config.TextColumn("Hoa hồng", width="medium"),
@@ -447,12 +443,15 @@ if uploaded_file is not None:
         shop_stats['Tỉ lệ hoa hồng'] = (shop_stats['Hoa_hồng'] / shop_stats['GMV'] * 100).round(2)
         shop_stats = shop_stats.nlargest(10, 'Số_đơn').reset_index(drop=True)
         
-        # Tạo link shop
-        shop_stats['Link'] = shop_stats['Shop id'].apply(lambda x: f"https://shopee.vn/shop/{x}")
+        # Tạo link shop với markdown
+        shop_stats['Tên có link'] = shop_stats.apply(
+            lambda row: f"[{row['Tên Shop']}](https://shopee.vn/shop/{row['Shop id']})",
+            axis=1
+        )
         
         top_shops = pd.DataFrame({
             'STT': range(1, len(shop_stats) + 1),
-            'Tên shop': shop_stats['Link'],  # Đưa link vào cột
+            'Tên shop': shop_stats['Tên có link'],
             'Tổng GMV': shop_stats['GMV'].apply(format_currency),
             'Số đơn': shop_stats['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.')),
             'Hoa hồng': shop_stats['Hoa_hồng'].apply(format_currency),
@@ -465,11 +464,7 @@ if uploaded_file is not None:
             hide_index=True,
             column_config={
                 "STT": st.column_config.NumberColumn("STT", width="small"),
-                "Tên shop": st.column_config.LinkColumn(
-                    "Tên shop",
-                    display_text=shop_stats['Tên Shop'].tolist(),  # Hiển thị tên shop
-                    width="large"
-                ),
+                "Tên shop": st.column_config.TextColumn("Tên shop", width="large"),
                 "Tổng GMV": st.column_config.TextColumn("Tổng GMV", width="medium"),
                 "Số đơn": st.column_config.TextColumn("Số đơn", width="small"),
                 "Hoa hồng": st.column_config.TextColumn("Hoa hồng", width="medium"),
