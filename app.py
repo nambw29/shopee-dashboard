@@ -36,25 +36,27 @@ st.markdown("""
         display: none !important;
     }
     
-    /* Ẩn label "Choose a date range" của date_input - nhiều cách */
-    [data-testid="stDateInput"] label {
+    /* Ẩn text "Choose a date range" trong popup calendar */
+    [data-baseweb="popover"] h4 {
+        display: none !important;
+    }
+    
+    [data-baseweb="popover"] [role="heading"] {
+        display: none !important;
+    }
+    
+    /* Ẩn tất cả heading trong date picker popup */
+    div[data-baseweb="calendar"] ~ div h4 {
+        display: none !important;
+    }
+    
+    /* Target text "Choose a date range" trực tiếp */
+    [data-baseweb="popover"] div:not([data-baseweb]) h4:first-child {
         display: none !important;
         visibility: hidden !important;
         height: 0 !important;
-        font-size: 0 !important;
-    }
-    
-    [data-testid="stDateInput"] label p {
-        display: none !important;
-    }
-    
-    .stDateInput label {
-        display: none !important;
-    }
-    
-    /* Ẩn tất cả label trong date input */
-    div[data-baseweb="input"] label {
-        display: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
     
     /* Style cho bảng dataframe */
