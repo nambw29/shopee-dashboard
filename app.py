@@ -154,11 +154,54 @@ with col_date:
     if uploaded_file is not None:
         df_temp = load_data(uploaded_file)
         if df_temp is not None:
+            # Lựa chọn khoảng thời gian
+            from datetime import datetime, timedelta
+            
+            min_date = df_temp['Ngày'].min()
+            max_date = df_temp['Ngày'].max()
+            today = datetime.now().date()
+            
+            # Dropdown cho các lựa chọn thời gian
+            time_option = st.selectbox(
+                "Chọn khoảng thời gian:",
+                ["Ngày cập nhật lần cuối", "7 ngày qua", "15 ngày qua", "30 ngày qua", 
+                 "Tháng này", "Tháng trước", "Từ trước đến nay"],
+                label_visibility="visible"
+            )
+            
+            # Tính toán khoảng thời gian dựa trên lựa chọn
+            if time_option == "Ngày cập nhật lần cuối":
+                default_start = max_date
+                default_end = max_date
+            elif time_option == "7 ngày qua":
+                default_start = max(min_date, max_date - timedelta(days=6))
+                default_end = max_date
+            elif time_option == "15 ngày qua":
+                default_start = max(min_date, max_date - timedelta(days=14))
+                default_end = max_date
+            elif time_option == "30 ngày qua":
+                default_start = max(min_date, max_date - timedelta(days=29))
+                default_end = max_date
+            elif time_option == "Tháng này":
+                first_day_this_month = datetime(today.year, today.month, 1).date()
+                default_start = max(min_date, first_day_this_month)
+                default_end = max_date
+            elif time_option == "Tháng trước":
+                first_day_this_month = datetime(today.year, today.month, 1).date()
+                last_day_last_month = first_day_this_month - timedelta(days=1)
+                first_day_last_month = datetime(last_day_last_month.year, last_day_last_month.month, 1).date()
+                default_start = max(min_date, first_day_last_month)
+                default_end = min(max_date, last_day_last_month)
+            else:  # "Từ trước đến nay"
+                default_start = min_date
+                default_end = max_date
+            
+            # Bảng chọn ngày tháng (vẫn giữ nguyên)
             date_range = st.date_input(
-                "Thời gian:", 
-                [df_temp['Ngày'].min(), df_temp['Ngày'].max()], 
+                "Hoặc chọn ngày cụ thể:", 
+                [default_start, default_end], 
                 format="DD/MM/YYYY",
-                label_visibility="collapsed"
+                label_visibility="visible"
             )
     else:
         st.info("Vui lòng tải lên file CSV")
@@ -194,19 +237,22 @@ if uploaded_file is not None:
         comm_social = comm_by_channel[comm_by_channel['Phân loại nguồn'] == 'Social']['Tổng hoa hồng đơn hàng(₫)'].sum()
         comm_others = comm_by_channel[comm_by_channel['Phân loại nguồn'] == 'Others']['Tổng hoa hồng đơn hàng(₫)'].sum()
 
-        # HÀNG 1: 5 cột
-        col1, col2, col3, col4, col5 = st.columns(5)
+        # HÀNG 1: 4 cột
+        col1, col2, col3, col4 = st.columns(4)
         col1.metric("💰 Tổng Doanh Thu", format_currency(total_gmv))
         col2.metric("💵 Tổng Hoa Hồng", format_currency(total_comm))
         col3.metric("📦 Tổng Đơn Hàng", f"{total_orders:,}".replace(',', '.'))
         col4.metric("💎 Hoa Hồng Shopee", format_currency(hh_shopee))
-        col5.metric("⭐ Hoa Hồng Xtra", format_currency(hh_xtra))
         
-        # HÀNG 2: 5 cột
-        col6, col7, col8, col9, col10 = st.columns(5)
+        # HÀNG 2: 4 cột
+        col5, col6, col7, col8 = st.columns(4)
+        col5.metric("⭐ Hoa Hồng Xtra", format_currency(hh_xtra))
         col6.metric("📊 Tỷ Lệ Hoa Hồng", f"{commission_rate:.2f}%")
         col7.metric("🛒 Số Lượng Đã Bán", f"{total_quantity_sold:,}".replace(',', '.'))
         col8.metric("📈 Hoa Hồng TB/Đơn", format_currency(avg_commission_per_order))
+        
+        # HÀNG 3: 2 cột (Social và Others)
+        col9, col10 = st.columns(2)
         col9.metric("👥 Hoa Hồng Social", format_currency(comm_social))
         col10.metric("📋 Hoa Hồng Others", format_currency(comm_others))
 
@@ -407,7 +453,7 @@ if uploaded_file is not None:
         top_products = pd.DataFrame({
             'STT': range(1, len(product_stats) + 1),
             'Tên sản phẩm': product_stats['Tên Item'],
-            'Link': product_stats['Link'],
+            'Link sản phẩm': product_stats['Link'],
             'Tổng GMV': product_stats['GMV'].apply(format_currency),
             'Số đơn': product_stats['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.')),
             'Hoa hồng': product_stats['Hoa_hồng'].apply(format_currency),
@@ -421,7 +467,7 @@ if uploaded_file is not None:
             column_config={
                 "STT": st.column_config.NumberColumn("STT", width="small"),
                 "Tên sản phẩm": st.column_config.TextColumn("Tên sản phẩm", width="large"),
-                "Link": st.column_config.LinkColumn("🔗", width="small"),
+                "Link sản phẩm": st.column_config.LinkColumn("Link sản phẩm", width="medium"),
                 "Tổng GMV": st.column_config.TextColumn("Tổng GMV", width="medium"),
                 "Số đơn": st.column_config.TextColumn("Số đơn", width="small"),
                 "Hoa hồng": st.column_config.TextColumn("Hoa hồng", width="medium"),
@@ -451,7 +497,7 @@ if uploaded_file is not None:
         top_shops = pd.DataFrame({
             'STT': range(1, len(shop_stats) + 1),
             'Tên shop': shop_stats['Tên Shop'],
-            'Link': shop_stats['Link'],
+            'Link shop': shop_stats['Link'],
             'Tổng GMV': shop_stats['GMV'].apply(format_currency),
             'Số đơn': shop_stats['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.')),
             'Hoa hồng': shop_stats['Hoa_hồng'].apply(format_currency),
@@ -465,7 +511,7 @@ if uploaded_file is not None:
             column_config={
                 "STT": st.column_config.NumberColumn("STT", width="small"),
                 "Tên shop": st.column_config.TextColumn("Tên shop", width="large"),
-                "Link": st.column_config.LinkColumn("🔗", width="small"),
+                "Link shop": st.column_config.LinkColumn("Link shop", width="medium"),
                 "Tổng GMV": st.column_config.TextColumn("Tổng GMV", width="medium"),
                 "Số đơn": st.column_config.TextColumn("Số đơn", width="small"),
                 "Hoa hồng": st.column_config.TextColumn("Hoa hồng", width="medium"),
