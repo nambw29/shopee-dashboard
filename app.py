@@ -2,9 +2,14 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import locale
+import datetime
 
 # 1. Cấu hình trang
-st.set_page_config(page_title="Shopee Affiliate Analytics Dashboard by BLACKWHITE29", layout="wide", page_icon="🧧")
+st.set_page_config(
+    page_title="Shopee Affiliate Analytics Dashboard by BLACKWHITE29",
+    layout="wide",
+    page_icon="🧧"
+)
 
 # Cài đặt locale tiếng Việt cho date picker
 try:
@@ -13,9 +18,9 @@ except:
     try:
         locale.setlocale(locale.LC_TIME, 'Vietnamese_Vietnam.1258')
     except:
-        pass  # Sử dụng locale mặc định nếu không set được
+        pass
 
-# --- CSS để Việt hóa và tùy chỉnh vùng tải tệp ---
+# --- CSS tùy chỉnh ---
 st.markdown("""
     <style>
     [data-testid="stFileUploaderDropzoneInstructions"] > div > span {
@@ -36,7 +41,6 @@ st.markdown("""
         display: none !important;
     }
     
-    /* Style cho bảng dataframe */
     .stDataFrame {
         font-size: 14px;
     }
@@ -55,28 +59,25 @@ st.markdown("""
 
 # --- HÀM FORMAT SỐ TIỀN ---
 def format_currency(value):
-    """Định dạng số tiền theo kiểu: 868.368.902 ₫"""
     return f"{int(round(value, 0)):,}".replace(',', '.') + " ₫"
 
 # --- HÀM XỬ LÝ DỮ LIỆU ---
 @st.cache_data
 def load_data(file):
     try:
-        # Thử đọc với encoding utf-8-sig để xử lý BOM
+        # Thử các encoding phổ biến
         try:
             df = pd.read_csv(file, encoding='utf-8-sig')
         except:
-            # Nếu lỗi, thử encoding khác
-            file.seek(0)  # Reset file pointer
+            file.seek(0)
             try:
                 df = pd.read_csv(file, encoding='utf-8')
             except:
                 file.seek(0)
                 df = pd.read_csv(file, encoding='latin1')
         
-        # Kiểm tra nếu DataFrame rỗng hoặc không có cột
         if df.empty or len(df.columns) == 0:
-            st.error("File CSV không có dữ liệu hoặc không có cột. Vui lòng kiểm tra lại file.")
+            st.error("File CSV không có dữ liệu hoặc không có cột.")
             return None
             
         df['Thời Gian Đặt Hàng'] = pd.to_datetime(df['Thời Gian Đặt Hàng'])
@@ -85,20 +86,20 @@ def load_data(file):
         df['Ngày Click'] = df['Thời gian Click'].dt.date
         df['Giờ'] = df['Thời Gian Đặt Hàng'].dt.hour
         
-        cols_to_numeric = ['Giá trị đơn hàng (₫)', 'Tổng hoa hồng đơn hàng(₫)', 
-                           'Hoa hồng Shopee trên sản phẩm(₫)', 'Hoa hồng Xtra trên sản phẩm(₫)', 
-                           'Giá(₫)', 'Số lượng']
+        cols_to_numeric = [
+            'Giá trị đơn hàng (₫)', 'Tổng hoa hồng đơn hàng(₫)', 
+            'Hoa hồng Shopee trên sản phẩm(₫)', 'Hoa hồng Xtra trên sản phẩm(₫)', 
+            'Giá(₫)', 'Số lượng'
+        ]
         for col in cols_to_numeric:
             if col in df.columns:
                 if df[col].dtype == 'object':
-                     df[col] = df[col].astype(str).str.replace(',', '').str.replace('₫', '').replace('nan', '0')
+                    df[col] = df[col].astype(str).str.replace(',', '').str.replace('₫', '').replace('nan', '0')
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
 
-        # PHÂN LOẠI NGUỒN ĐƠN - GỘP FACEBOOK/INSTAGRAM THÀNH SOCIAL
+        # Phân loại nguồn
         def classify_source(row):
             kenh = str(row.get('Kênh', '')).strip()
-            
-            # Gộp các mạng xã hội thành Social
             if kenh in ['Facebook', 'Instagram', 'Zalo']:
                 return 'Social'
             elif kenh == 'Others':
@@ -110,19 +111,15 @@ def load_data(file):
             else:
                 return 'Others'
         
-        # PHÂN LOẠI VIDEO/LIVE SHOPEE - DỰA VÀO LOẠI SẢN PHẨM/HH
+        # Phân loại nội dung
         def classify_content_type(row):
-            # Kiểm tra các cột có thể chứa thông tin Video/Live của Shopee
             loai_sp = str(row.get('Loại sản phẩm', '')).lower()
             loai_hh = str(row.get('Loại Hoa hồng', '')).lower()
-            
-            # Shopee Video/Live thường có đánh dấu riêng trong Loại sản phẩm
             if 'video' in loai_sp or 'video' in loai_hh:
                 return 'Shopee Video'
             elif 'live' in loai_sp or 'live' in loai_hh or 'livestream' in loai_sp:
                 return 'Shopee Live'
             else:
-                # Nếu không có video/live của Shopee, phân loại theo SubID
                 sub_id3 = str(row.get('Sub_id3', '')).lower().strip()
                 if 'video' in sub_id3:
                     return 'Video (SubID)'
@@ -136,13 +133,12 @@ def load_data(file):
         
         return df
     except Exception as e:
-        st.error(f"Lỗi: {e}")
+        st.error(f"Lỗi khi đọc file: {e}")
         return None
 
-# --- GIAO DIỆN CHÍNH ---
+# === GIAO DIỆN CHÍNH ===
 st.title("🧧 Shopee Affiliate Analytics Dashboard by BLACKWHITE29")
 
-# BỐ TRÍ UPLOAD FILE VÀ CHỌN THỜI GIAN TRÊN 1 DÒNG (BỎ ICON)
 col_upload, col_date = st.columns([1, 1])
 
 with col_upload:
@@ -156,11 +152,8 @@ with col_date:
         if df_temp is not None:
             min_date = df_temp['Ngày'].min()
             max_date = df_temp['Ngày'].max()
-            
-            import datetime
             today = datetime.date.today()
-            
-            # Các lựa chọn khoảng thời gian
+
             time_range_options = {
                 "Ngày cập nhật lần cuối": (max_date, max_date),
                 "7 ngày qua": (today - datetime.timedelta(days=7), today),
@@ -168,8 +161,8 @@ with col_date:
                 "30 ngày qua": (today - datetime.timedelta(days=30), today),
                 "Tháng này": (datetime.date(today.year, today.month, 1), today),
                 "Tháng trước": (
-                    datetime.date(today.year, today.month - 1 if today.month > 1 else 12, 1) if today.month > 1 
-                    else datetime.date(today.year - 1, 12, 1),
+                    datetime.date(today.year, today.month - 1 if today.month > 1 else 12, 1) 
+                    if today.month > 1 else datetime.date(today.year - 1, 12, 1),
                     (datetime.date(today.year, today.month, 1) - datetime.timedelta(days=1))
                 ),
                 "Từ trước đến nay": (min_date, max_date)
@@ -178,16 +171,12 @@ with col_date:
             selected_range = st.selectbox(
                 "Lựa chọn:",
                 options=list(time_range_options.keys()),
-                index=0,  # Mặc định: Ngày cập nhật lần cuối
+                index=0,
                 label_visibility="collapsed"
             )
             
-            # Lấy khoảng thời gian
             date_range = time_range_options[selected_range]
-            
-            # Hiển thị khoảng thời gian
-            if date_range:
-                st.info(f"📅 {date_range[0].strftime('%d/%m/%Y')} - {date_range[1].strftime('%d/%m/%Y')}")
+            st.info(f"📅 {date_range[0].strftime('%d/%m/%Y')} - {date_range[1].strftime('%d/%m/%Y')}")
     else:
         st.info("Vui lòng tải lên file CSV")
         date_range = None
@@ -196,7 +185,6 @@ if uploaded_file is not None:
     df = load_data(uploaded_file)
     if df is not None:
         
-        # Lọc theo thời gian
         if date_range:
             df_filtered = df[(df['Ngày'] >= date_range[0]) & (df['Ngày'] <= date_range[1])]
         else:
@@ -204,25 +192,22 @@ if uploaded_file is not None:
 
         st.markdown("---")
 
-        # MỤC 1: THỐNG KÊ TỔNG QUAN - SẮP XẾP LẠI
+        # 1. THỐNG KÊ TỔNG QUAN
         st.header("1. Thống kê tổng quan")
         
-        # TÍNH TOÁN
         total_gmv = df_filtered['Giá trị đơn hàng (₫)'].sum()
         total_comm = df_filtered['Tổng hoa hồng đơn hàng(₫)'].sum()
         total_orders = df_filtered['ID đơn hàng'].nunique()
         hh_shopee = df_filtered['Hoa hồng Shopee trên sản phẩm(₫)'].sum()
         hh_xtra = df_filtered['Hoa hồng Xtra trên sản phẩm(₫)'].sum()
-        commission_rate = (total_comm/total_gmv*100 if total_gmv > 0 else 0)
+        commission_rate = (total_comm / total_gmv * 100 if total_gmv > 0 else 0)
         total_quantity_sold = int(df_filtered['Số lượng'].sum())
-        avg_commission_per_order = (total_comm/total_orders if total_orders > 0 else 0)
+        avg_commission_per_order = (total_comm / total_orders if total_orders > 0 else 0)
         
-        # Tính hoa hồng theo kênh (Social vs Others)
         comm_by_channel = df_filtered.groupby(['ID đơn hàng', 'Phân loại nguồn'])['Tổng hoa hồng đơn hàng(₫)'].first().reset_index()
         comm_social = comm_by_channel[comm_by_channel['Phân loại nguồn'] == 'Social']['Tổng hoa hồng đơn hàng(₫)'].sum()
         comm_others = comm_by_channel[comm_by_channel['Phân loại nguồn'] == 'Others']['Tổng hoa hồng đơn hàng(₫)'].sum()
 
-        # HÀNG 1: 5 cột
         col1, col2, col3, col4, col5 = st.columns(5)
         col1.metric("💰 Tổng Doanh Thu", format_currency(total_gmv))
         col2.metric("💵 Tổng Hoa Hồng", format_currency(total_comm))
@@ -230,7 +215,6 @@ if uploaded_file is not None:
         col4.metric("💎 Hoa Hồng Shopee", format_currency(hh_shopee))
         col5.metric("⭐ Hoa Hồng Xtra", format_currency(hh_xtra))
         
-        # HÀNG 2: 5 cột
         col6, col7, col8, col9, col10 = st.columns(5)
         col6.metric("📊 Tỷ Lệ Hoa Hồng", f"{commission_rate:.2f}%")
         col7.metric("🛒 Số Lượng Đã Bán", f"{total_quantity_sold:,}".replace(',', '.'))
@@ -240,24 +224,20 @@ if uploaded_file is not None:
 
         st.markdown("---")
 
-        # MỤC 2: THỐNG KÊ ĐƠN HÀNG
+        # 2. THỐNG KÊ ĐƠN HÀNG
         st.header("2. Thống kê đơn hàng")
         
-        # Đếm đơn hàng unique theo kênh (Social vs Others)
         orders_by_channel = df_filtered.groupby('Phân loại nguồn')['ID đơn hàng'].nunique()
         orders_social = orders_by_channel.get('Social', 0)
         orders_others = orders_by_channel.get('Others', 0)
         
-        # Đếm đơn theo loại nội dung (Shopee Video/Live)
         orders_by_content = df_filtered.groupby('Loại nội dung')['ID đơn hàng'].nunique()
         orders_video = orders_by_content.get('Shopee Video', 0)
         orders_live = orders_by_content.get('Shopee Live', 0)
         
-        # Đơn 0 đồng và đơn hủy
         orders_zero = df_filtered[df_filtered['Giá trị đơn hàng (₫)'] == 0]['ID đơn hàng'].nunique()
         orders_cancelled = df_filtered[df_filtered['Trạng thái đặt hàng'].str.contains('Hủy', case=False, na=False)]['ID đơn hàng'].nunique()
         
-        # 1 HÀNG 6 CỘT
         c1, c2, c3, c4, c5, c6 = st.columns(6)
         c1.metric("👥 Đơn Social", f"{orders_social:,}".replace(',', '.'))
         c2.metric("📋 Đơn Others", f"{orders_others:,}".replace(',', '.'))
@@ -268,12 +248,11 @@ if uploaded_file is not None:
 
         st.markdown("---")
 
-        # MỤC 3: BIỂU ĐỒ THỐNG KÊ
+        # 3. BIỂU ĐỒ
         st.header("3. Biểu đồ thống kê")
         col_a, col_b = st.columns(2)
         
         with col_a:
-            # Biểu đồ Hoa hồng theo ngày
             daily_comm = df_filtered.groupby('Ngày')['Tổng hoa hồng đơn hàng(₫)'].sum().reset_index()
             daily_comm['Ngày_str'] = daily_comm['Ngày'].apply(lambda x: x.strftime('%d/%m/%Y'))
             daily_comm['Hoa_hồng_formatted'] = daily_comm['Tổng hoa hồng đơn hàng(₫)'].apply(format_currency)
@@ -285,7 +264,6 @@ if uploaded_file is not None:
             )
             st.plotly_chart(fig1, use_container_width=True)
             
-            # Biểu đồ tròn - Tỷ trọng đơn hàng theo kênh - SỬA HIỂN THỊ HOVER
             channel_stats = df_filtered.groupby('Phân loại nguồn').agg(
                 Số_đơn=('ID đơn hàng', 'nunique'),
                 Hoa_hồng=('Tổng hoa hồng đơn hàng(₫)', 'sum')
@@ -295,20 +273,10 @@ if uploaded_file is not None:
             channel_stats['Hoa_hồng_formatted'] = channel_stats['Hoa hồng'].apply(format_currency)
             channel_stats['Số_đơn_formatted'] = channel_stats['Số đơn'].apply(lambda x: f"{x:,}".replace(',', '.'))
             
-            fig2 = px.pie(
-                channel_stats, 
-                names='Kênh', 
-                values='Số đơn',
-                title="Tỷ trọng đơn hàng theo kênh"
-            )
-            
-            # Tạo hover text riêng cho từng kênh
+            fig2 = px.pie(channel_stats, names='Kênh', values='Số đơn', title="Tỷ trọng đơn hàng theo kênh")
             hover_texts = []
-            for idx, row in channel_stats.iterrows():
-                hover_text = f"<b>{row['Kênh']}</b><br>"
-                hover_text += f"Số đơn: {row['Số_đơn_formatted']}<br>"
-                hover_text += f"Tỷ trọng: {row['Tỷ trọng']:.2f}%<br>"
-                hover_text += f"Hoa hồng: {row['Hoa_hồng_formatted']}"
+            for _, row in channel_stats.iterrows():
+                hover_text = f"<b>{row['Kênh']}</b><br>Số đơn: {row['Số_đơn_formatted']}<br>Tỷ trọng: {row['Tỷ trọng']:.2f}%<br>Hoa hồng: {row['Hoa_hồng_formatted']}"
                 hover_texts.append(hover_text)
             
             fig2.update_traces(
@@ -320,7 +288,6 @@ if uploaded_file is not None:
             st.plotly_chart(fig2, use_container_width=True)
 
         with col_b:
-            # Biểu đồ Hoa hồng theo khung giờ
             hourly_comm = df_filtered.groupby('Giờ')['Tổng hoa hồng đơn hàng(₫)'].sum().reset_index()
             hourly_comm['Hoa_hồng_formatted'] = hourly_comm['Tổng hoa hồng đơn hàng(₫)'].apply(format_currency)
             
@@ -331,12 +298,10 @@ if uploaded_file is not None:
             )
             st.plotly_chart(fig3, use_container_width=True)
             
-            # Top 10 Danh mục
             cat_data = df_filtered.groupby('L1 Danh mục toàn cầu').agg(
                 Số_đơn=('ID đơn hàng', 'count'), 
                 Hoa_hồng=('Tổng hoa hồng đơn hàng(₫)', 'sum')
             ).nlargest(10, 'Hoa_hồng').reset_index()
-            
             cat_data.columns = ['Danh mục sản phẩm', 'Số_đơn', 'Hoa hồng (₫)']
             cat_data['Số_đơn_formatted'] = cat_data['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.'))
             cat_data['Hoa_hồng_formatted'] = cat_data['Hoa hồng (₫)'].apply(format_currency)
@@ -350,7 +315,7 @@ if uploaded_file is not None:
 
         st.markdown("---")
         
-        # MỤC 4: TOP 20 SUBID
+        # 4. TOP 20 SUBID
         st.header("4. Top 20 SubID hiệu quả nhất")
         
         sub_id_cols = ['Sub_id1', 'Sub_id2', 'Sub_id3', 'Sub_id4', 'Sub_id5']
@@ -363,60 +328,39 @@ if uploaded_file is not None:
         
         if sub_list:
             all_subs = pd.concat(sub_list).groupby('SubID').agg(
-                Số_đơn=('SubID','count'), 
-                Hoa_hồng=('HoaHồng','sum')
+                Số_đơn=('SubID', 'count'), 
+                Hoa_hồng=('HoaHồng', 'sum')
             ).reset_index().sort_values('Số_đơn', ascending=False).head(20)
             
-            # Tạo bảng hiển thị đẹp
             display_df = pd.DataFrame({
                 'Xếp Hạng': range(1, len(all_subs) + 1),
-                'SubID': all_subs['SubID'].values,
-                'Số Đơn': all_subs['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.')).values,
-                'Tổng Hoa Hồng': all_subs['Hoa_hồng'].apply(format_currency).values,
-                'HH Trung Bình/Đơn': all_subs.apply(lambda row: format_currency(row['Hoa_hồng']/row['Số_đơn'] if row['Số_đơn'] > 0 else 0), axis=1).values
+                'SubID': all_subs['SubID'],
+                'Số Đơn': all_subs['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.')),
+                'Tổng Hoa Hồng': all_subs['Hoa_hồng'].apply(format_currency),
+                'HH Trung Bình/Đơn': all_subs.apply(
+                    lambda row: format_currency(row['Hoa_hồng'] / row['Số_đơn'] if row['Số_đơn'] > 0 else 0), axis=1
+                )
             })
             
-            # Hiển thị bảng với style đẹp
             st.dataframe(
                 display_df,
                 use_container_width=True,
                 hide_index=True,
                 column_config={
-                    "Xếp Hạng": st.column_config.NumberColumn(
-                        "Xếp Hạng",
-                        help="Xếp hạng theo số đơn",
-                        width="small",
-                    ),
-                    "SubID": st.column_config.TextColumn(
-                        "SubID",
-                        help="Mã SubID",
-                        width="medium",
-                    ),
-                    "Số Đơn": st.column_config.TextColumn(
-                        "Số Đơn",
-                        help="Tổng số đơn hàng",
-                        width="small",
-                    ),
-                    "Tổng Hoa Hồng": st.column_config.TextColumn(
-                        "Tổng Hoa Hồng",
-                        help="Tổng hoa hồng kiếm được",
-                        width="medium",
-                    ),
-                    "HH Trung Bình/Đơn": st.column_config.TextColumn(
-                        "HH TB/Đơn",
-                        help="Hoa hồng trung bình mỗi đơn",
-                        width="medium",
-                    ),
+                    "Xếp Hạng": st.column_config.NumberColumn("Xếp Hạng", width="small"),
+                    "SubID": st.column_config.TextColumn("SubID", width="medium"),
+                    "Số Đơn": st.column_config.TextColumn("Số Đơn", width="small"),
+                    "Tổng Hoa Hồng": st.column_config.TextColumn("Tổng Hoa Hồng", width="medium"),
+                    "HH Trung Bình/Đơn": st.column_config.TextColumn("HH TB/Đơn", width="medium"),
                 },
                 height=600
             )
 
         st.markdown("---")
         
-        # MỤC 5: TOP 10 SẢN PHẨM NHIỀU ĐƠN NHẤT
+        # 5. TOP 10 SẢN PHẨM NHIỀU ĐƠN NHẤT (sửa bằng LinkColumn)
         st.header("5. Top 10 sản phẩm nhiều đơn nhất")
         
-        # Group by both Tên Item, Shop id và Item id để lấy link
         product_stats = df_filtered.groupby(['Tên Item', 'Shop id', 'Item id']).agg(
             GMV=('Giá trị đơn hàng (₫)', 'sum'),
             Số_đơn=('ID đơn hàng', 'count'),
@@ -426,84 +370,53 @@ if uploaded_file is not None:
         product_stats['Tỉ lệ hoa hồng'] = (product_stats['Hoa_hồng'] / product_stats['GMV'] * 100).round(2)
         product_stats = product_stats.nlargest(10, 'Số_đơn').reset_index(drop=True)
         
-        # Tạo HTML table với link nhúng trong tên sản phẩm
-        html_table = """
-        <style>
-            .product-table {
-                width: 100%;
-                border-collapse: collapse;
-                margin: 20px 0;
-                font-size: 14px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        if not product_stats.empty:
+            product_stats['Link sản phẩm'] = product_stats.apply(
+                lambda row: f"https://shopee.vn/product/{row['Shop id']}/{row['Item id']}", axis=1
+            )
+            
+            display_cols = {
+                'Tên Item': 'Tên sản phẩm',
+                'Link sản phẩm': 'Link',
+                'GMV': 'Tổng GMV',
+                'Số_đơn': 'Số đơn',
+                'Hoa_hồng': 'Hoa hồng',
+                'Tỉ lệ hoa hồng': 'Tỉ lệ HH (%)'
             }
-            .product-table thead tr {
-                background-color: #f0f2f6;
-                text-align: left;
-                font-weight: bold;
-            }
-            .product-table th,
-            .product-table td {
-                padding: 12px 15px;
-                border: 1px solid #ddd;
-            }
-            .product-table tbody tr:hover {
-                background-color: #f5f5f5;
-            }
-            .product-table a {
-                color: #0066cc;
-                text-decoration: none;
-            }
-            .product-table a:hover {
-                text-decoration: underline;
-            }
-            .text-center {
-                text-align: center;
-            }
-            .text-right {
-                text-align: right;
-            }
-        </style>
-        <table class="product-table">
-            <thead>
-                <tr>
-                    <th class="text-center">STT</th>
-                    <th>Tên sản phẩm</th>
-                    <th class="text-right">Tổng GMV</th>
-                    <th class="text-center">Số đơn</th>
-                    <th class="text-right">Hoa hồng</th>
-                    <th class="text-center">Tỉ lệ HH</th>
-                </tr>
-            </thead>
-            <tbody>
-        """
-        
-        for idx, row in product_stats.iterrows():
-            product_link = f"https://shopee.vn/product/{row['Shop id']}/{row['Item id']}"
-            so_don_formatted = f"{row['Số_đơn']:,}".replace(',', '.')
-            html_table += f"""
-                <tr>
-                    <td class="text-center">{idx + 1}</td>
-                    <td><a href="{product_link}" target="_blank">{row['Tên Item']}</a></td>
-                    <td class="text-right">{format_currency(row['GMV'])}</td>
-                    <td class="text-center">{so_don_formatted}</td>
-                    <td class="text-right">{format_currency(row['Hoa_hồng'])}</td>
-                    <td class="text-center">{row['Tỉ lệ hoa hồng']:.2f}%</td>
-                </tr>
-            """
-        
-        html_table += """
-            </tbody>
-        </table>
-        """
-        
-        st.markdown(html_table, unsafe_allow_html=True)
+            
+            display_df = product_stats.rename(columns=display_cols)[list(display_cols.values())]
+            
+            display_df['Tổng GMV'] = display_df['Tổng GMV'].apply(format_currency)
+            display_df['Hoa hồng'] = display_df['Hoa hồng'].apply(format_currency)
+            display_df['Số đơn'] = display_df['Số đơn'].apply(lambda x: f"{x:,}".replace(',', '.'))
+            
+            st.dataframe(
+                display_df,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Tên sản phẩm": st.column_config.TextColumn("Tên sản phẩm"),
+                    "Link": st.column_config.LinkColumn(
+                        "Link",
+                        display_text="Xem sản phẩm",
+                        help="Nhấn để mở trang sản phẩm trên Shopee",
+                        width="medium"
+                    ),
+                    "Tổng GMV": st.column_config.TextColumn("Tổng GMV", width="small"),
+                    "Số đơn": st.column_config.TextColumn("Số đơn", width="small"),
+                    "Hoa hồng": st.column_config.TextColumn("Hoa hồng", width="small"),
+                    "Tỉ lệ HH (%)": st.column_config.NumberColumn("Tỉ lệ HH (%)", format="%.2f", width="small"),
+                },
+                height=450
+            )
+        else:
+            st.info("Không có dữ liệu sản phẩm trong khoảng thời gian đã chọn.")
 
         st.markdown("---")
         
-        # MỤC 6: TOP 10 SHOP CÓ NHIỀU ĐƠN NHẤT
+        # 6. TOP 10 SHOP CÓ NHIỀU ĐƠN NHẤT (sửa bằng LinkColumn)
         st.header("6. Top 10 shop có nhiều đơn nhất")
         
-        # Group by both Tên Shop và Shop id để lấy link
         shop_stats = df_filtered.groupby(['Tên Shop', 'Shop id']).agg(
             GMV=('Giá trị đơn hàng (₫)', 'sum'),
             Số_đơn=('ID đơn hàng', 'nunique'),
@@ -513,101 +426,69 @@ if uploaded_file is not None:
         shop_stats['Tỉ lệ hoa hồng'] = (shop_stats['Hoa_hồng'] / shop_stats['GMV'] * 100).round(2)
         shop_stats = shop_stats.nlargest(10, 'Số_đơn').reset_index(drop=True)
         
-        # Tạo HTML table với link nhúng trong tên shop
-        html_table = """
-        <style>
-            .shop-table {
-                width: 100%;
-                border-collapse: collapse;
-                margin: 20px 0;
-                font-size: 14px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        if not shop_stats.empty:
+            shop_stats['Link shop'] = shop_stats['Shop id'].apply(lambda x: f"https://shopee.vn/shop/{x}")
+            
+            display_cols_shop = {
+                'Tên Shop': 'Tên shop',
+                'Link shop': 'Link',
+                'GMV': 'Tổng GMV',
+                'Số_đơn': 'Số đơn',
+                'Hoa_hồng': 'Hoa hồng',
+                'Tỉ lệ hoa hồng': 'Tỉ lệ HH (%)'
             }
-            .shop-table thead tr {
-                background-color: #f0f2f6;
-                text-align: left;
-                font-weight: bold;
-            }
-            .shop-table th,
-            .shop-table td {
-                padding: 12px 15px;
-                border: 1px solid #ddd;
-            }
-            .shop-table tbody tr:hover {
-                background-color: #f5f5f5;
-            }
-            .shop-table a {
-                color: #0066cc;
-                text-decoration: none;
-            }
-            .shop-table a:hover {
-                text-decoration: underline;
-            }
-            .text-center {
-                text-align: center;
-            }
-            .text-right {
-                text-align: right;
-            }
-        </style>
-        <table class="shop-table">
-            <thead>
-                <tr>
-                    <th class="text-center">STT</th>
-                    <th>Tên shop</th>
-                    <th class="text-right">Tổng GMV</th>
-                    <th class="text-center">Số đơn</th>
-                    <th class="text-right">Hoa hồng</th>
-                    <th class="text-center">Tỉ lệ HH</th>
-                </tr>
-            </thead>
-            <tbody>
-        """
-        
-        for idx, row in shop_stats.iterrows():
-            shop_link = f"https://shopee.vn/shop/{row['Shop id']}"
-            so_don_formatted = f"{row['Số_đơn']:,}".replace(',', '.')
-            html_table += f"""
-                <tr>
-                    <td class="text-center">{idx + 1}</td>
-                    <td><a href="{shop_link}" target="_blank">{row['Tên Shop']}</a></td>
-                    <td class="text-right">{format_currency(row['GMV'])}</td>
-                    <td class="text-center">{so_don_formatted}</td>
-                    <td class="text-right">{format_currency(row['Hoa_hồng'])}</td>
-                    <td class="text-center">{row['Tỉ lệ hoa hồng']:.2f}%</td>
-                </tr>
-            """
-        
-        html_table += """
-            </tbody>
-        </table>
-        """
-        
-        st.markdown(html_table, unsafe_allow_html=True)
+            
+            display_df_shop = shop_stats.rename(columns=display_cols_shop)[list(display_cols_shop.values())]
+            
+            display_df_shop['Tổng GMV'] = display_df_shop['Tổng GMV'].apply(format_currency)
+            display_df_shop['Hoa hồng'] = display_df_shop['Hoa hồng'].apply(format_currency)
+            display_df_shop['Số đơn'] = display_df_shop['Số đơn'].apply(lambda x: f"{x:,}".replace(',', '.'))
+            
+            st.dataframe(
+                display_df_shop,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Tên shop": st.column_config.TextColumn("Tên shop"),
+                    "Link": st.column_config.LinkColumn(
+                        "Link",
+                        display_text="Xem shop",
+                        help="Nhấn để mở trang shop trên Shopee",
+                        width="medium"
+                    ),
+                    "Tổng GMV": st.column_config.TextColumn("Tổng GMV", width="small"),
+                    "Số đơn": st.column_config.TextColumn("Số đơn", width="small"),
+                    "Hoa hồng": st.column_config.TextColumn("Hoa hồng", width="small"),
+                    "Tỉ lệ HH (%)": st.column_config.NumberColumn("Tỉ lệ HH (%)", format="%.2f", width="small"),
+                },
+                height=450
+            )
+        else:
+            st.info("Không có dữ liệu shop trong khoảng thời gian đã chọn.")
 
         st.markdown("---")
         
-        # MỤC 7: CHI TIẾT ĐƠN HÀNG
+        # 7. CHI TIẾT ĐƠN HÀNG
         st.header("7. Chi tiết đơn hàng")
         
-        # Chuẩn bị dữ liệu chi tiết
-        detail_cols = ['ID đơn hàng', 'Tên Shop', 'Tên Item', 'Giá(₫)', 'Số lượng', 
-                       'Tổng hoa hồng đơn hàng(₫)', 'Trạng thái đặt hàng', 'Kênh', 
-                       'Sub_id1', 'Sub_id2', 'Sub_id3', 'Sub_id4', 'Sub_id5']
+        detail_cols = [
+            'ID đơn hàng', 'Tên Shop', 'Tên Item', 'Giá(₫)', 'Số lượng', 
+            'Tổng hoa hồng đơn hàng(₫)', 'Trạng thái đặt hàng', 'Kênh', 
+            'Sub_id1', 'Sub_id2', 'Sub_id3', 'Sub_id4', 'Sub_id5'
+        ]
         
         df_detail = df_filtered[detail_cols].copy()
         
-        # Format lại cột Giá và Tổng hoa hồng
-        df_detail['Giá(₫)'] = df_detail['Giá(₫)'].apply(lambda x: format_currency(x))
-        df_detail['Tổng hoa hồng đơn hàng(₫)'] = df_detail['Tổng hoa hồng đơn hàng(₫)'].apply(lambda x: format_currency(x))
-        df_detail['Số lượng'] = df_detail['Số lượng'].apply(lambda x: int(x))
+        df_detail['Giá(₫)'] = df_detail['Giá(₫)'].apply(format_currency)
+        df_detail['Tổng hoa hồng đơn hàng(₫)'] = df_detail['Tổng hoa hồng đơn hàng(₫)'].apply(format_currency)
+        df_detail['Số lượng'] = df_detail['Số lượng'].astype(int)
         
-        # Đổi tên cột cho dễ đọc
-        df_detail.columns = ['ID Đơn Hàng', 'Tên Shop', 'Tên Sản Phẩm', 'Giá', 'Số Lượng', 
-                            'Tổng Hoa Hồng', 'Trạng Thái', 'Kênh', 
-                            'SubID 1', 'SubID 2', 'SubID 3', 'SubID 4', 'SubID 5']
+        df_detail.columns = [
+            'ID Đơn Hàng', 'Tên Shop', 'Tên Sản Phẩm', 'Giá', 'Số Lượng', 
+            'Tổng Hoa Hồng', 'Trạng Thái', 'Kênh', 
+            'SubID 1', 'SubID 2', 'SubID 3', 'SubID 4', 'SubID 5'
+        ]
         
-        # Tạo tabs cho các loại đơn hàng
         tab1, tab2, tab3 = st.tabs([
             f"📦 Tất cả đơn ({len(df_detail):,} dòng)".replace(',', '.'),
             f"⏳ Đơn đang chờ xử lý ({df_detail[df_detail['Trạng Thái'].str.contains('chờ xử lý', case=False, na=False)].shape[0]:,} dòng)".replace(',', '.'),
@@ -621,7 +502,7 @@ if uploaded_file is not None:
         with tab2:
             df_pending = df_detail[df_detail['Trạng Thái'].str.contains('chờ xử lý', case=False, na=False)]
             st.markdown(f"**Tổng số dòng:** {len(df_pending):,}".replace(',', '.'))
-            if len(df_pending) > 0:
+            if not df_pending.empty:
                 st.dataframe(df_pending, use_container_width=True, hide_index=True, height=500)
             else:
                 st.info("Không có đơn hàng đang chờ xử lý")
@@ -629,7 +510,7 @@ if uploaded_file is not None:
         with tab3:
             df_cancelled = df_detail[df_detail['Trạng Thái'].str.contains('Hủy', case=False, na=False)]
             st.markdown(f"**Tổng số dòng:** {len(df_cancelled):,}".replace(',', '.'))
-            if len(df_cancelled) > 0:
+            if not df_cancelled.empty:
                 st.dataframe(df_cancelled, use_container_width=True, hide_index=True, height=500)
             else:
                 st.info("Không có đơn hàng đã hủy")
