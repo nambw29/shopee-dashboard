@@ -36,8 +36,24 @@ st.markdown("""
         display: none !important;
     }
     
-    /* Ẩn label "Choose a date range" của date_input */
+    /* Ẩn label "Choose a date range" của date_input - nhiều cách */
     [data-testid="stDateInput"] label {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        font-size: 0 !important;
+    }
+    
+    [data-testid="stDateInput"] label p {
+        display: none !important;
+    }
+    
+    .stDateInput label {
+        display: none !important;
+    }
+    
+    /* Ẩn tất cả label trong date input */
+    div[data-baseweb="input"] label {
         display: none !important;
     }
     
