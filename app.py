@@ -176,7 +176,7 @@ if uploaded_file is not None:
 
         st.markdown("---")
 
-        # MỤC 1: THỐNG KÊ TỔNG QUAN - XẾP 2 HÀNG 5 CỘT
+        # MỤC 1: THỐNG KÊ TỔNG QUAN - SẮP XẾP LẠI
         st.header("1. Thống kê tổng quan")
         
         # TÍNH TOÁN
@@ -225,42 +225,111 @@ if uploaded_file is not None:
         orders_video = orders_by_content.get('Shopee Video', 0)
         orders_live = orders_by_content.get('Shopee Live', 0)
         
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("📱 Đơn từ Social", f"{orders_social:,}".replace(',', '.'))
-        col2.metric("🌐 Đơn từ Others", f"{orders_others:,}".replace(',', '.'))
-        col3.metric("📹 Đơn Shopee Video", f"{orders_video:,}".replace(',', '.'))
-        col4.metric("🎥 Đơn Shopee Live", f"{orders_live:,}".replace(',', '.'))
+        # Đơn 0 đồng và đơn hủy
+        orders_zero = df_filtered[df_filtered['Giá trị đơn hàng (₫)'] == 0]['ID đơn hàng'].nunique()
+        orders_cancelled = df_filtered[df_filtered['Trạng thái đặt hàng'].str.contains('Hủy', case=False, na=False)]['ID đơn hàng'].nunique()
+        
+        # 1 HÀNG 6 CỘT
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
+        c1.metric("👥 Đơn Social", f"{orders_social:,}".replace(',', '.'))
+        c2.metric("📋 Đơn Others", f"{orders_others:,}".replace(',', '.'))
+        c3.metric("🎬 Đơn Video", f"{orders_video:,}".replace(',', '.'))
+        c4.metric("📹 Đơn Live", f"{orders_live:,}".replace(',', '.'))
+        c5.metric("🆓 Đơn 0 Đồng", f"{orders_zero:,}".replace(',', '.'))
+        c6.metric("❌ Đơn Hủy", f"{orders_cancelled:,}".replace(',', '.'))
 
         st.markdown("---")
 
-        # MỤC 3: BIỂU ĐỒ DOANH THU VÀ HOA HỒNG
-        st.header("3. Biểu đồ doanh thu & hoa hồng")
+        # MỤC 3: BIỂU ĐỒ THỐNG KÊ
+        st.header("3. Biểu đồ thống kê")
+        col_a, col_b = st.columns(2)
         
-        daily_stats = df_filtered.groupby('Ngày').agg({
-            'Giá trị đơn hàng (₫)': 'sum',
-            'Tổng hoa hồng đơn hàng(₫)': 'sum',
-            'ID đơn hàng': 'nunique'
-        }).reset_index()
-        daily_stats.columns = ['Ngày', 'Doanh thu', 'Hoa hồng', 'Số đơn']
-        
-        fig = px.line(daily_stats, x='Ngày', y=['Doanh thu', 'Hoa hồng'], 
-                     title='Biểu đồ doanh thu và hoa hồng theo ngày',
-                     labels={'value': 'Số tiền (₫)', 'variable': 'Loại'},
-                     template='plotly_white')
-        fig.update_layout(hovermode='x unified')
-        st.plotly_chart(fig, use_container_width=True)
+        with col_a:
+            # Biểu đồ Hoa hồng theo ngày
+            daily_comm = df_filtered.groupby('Ngày')['Tổng hoa hồng đơn hàng(₫)'].sum().reset_index()
+            daily_comm['Ngày_str'] = daily_comm['Ngày'].apply(lambda x: x.strftime('%d/%m/%Y'))
+            daily_comm['Hoa_hồng_formatted'] = daily_comm['Tổng hoa hồng đơn hàng(₫)'].apply(format_currency)
+            
+            fig1 = px.line(daily_comm, x='Ngày', y='Tổng hoa hồng đơn hàng(₫)', title="Hoa hồng theo ngày")
+            fig1.update_traces(
+                hovertemplate="<b>Ngày:</b> %{customdata[0]}<br><b>Hoa hồng:</b> %{customdata[1]}<extra></extra>",
+                customdata=daily_comm[['Ngày_str', 'Hoa_hồng_formatted']]
+            )
+            st.plotly_chart(fig1, use_container_width=True)
+            
+            # Biểu đồ tròn - Tỷ trọng đơn hàng theo kênh - SỬA HIỂN THỊ HOVER
+            channel_stats = df_filtered.groupby('Phân loại nguồn').agg(
+                Số_đơn=('ID đơn hàng', 'nunique'),
+                Hoa_hồng=('Tổng hoa hồng đơn hàng(₫)', 'sum')
+            ).reset_index()
+            channel_stats.columns = ['Kênh', 'Số đơn', 'Hoa hồng']
+            channel_stats['Tỷ trọng'] = (channel_stats['Số đơn'] / channel_stats['Số đơn'].sum() * 100).round(2)
+            channel_stats['Hoa_hồng_formatted'] = channel_stats['Hoa hồng'].apply(format_currency)
+            channel_stats['Số_đơn_formatted'] = channel_stats['Số đơn'].apply(lambda x: f"{x:,}".replace(',', '.'))
+            
+            fig2 = px.pie(
+                channel_stats, 
+                names='Kênh', 
+                values='Số đơn',
+                title="Tỷ trọng đơn hàng theo kênh"
+            )
+            
+            # Tạo hover text riêng cho từng kênh
+            hover_texts = []
+            for idx, row in channel_stats.iterrows():
+                hover_text = f"<b>{row['Kênh']}</b><br>"
+                hover_text += f"Số đơn: {row['Số_đơn_formatted']}<br>"
+                hover_text += f"Tỷ trọng: {row['Tỷ trọng']:.2f}%<br>"
+                hover_text += f"Hoa hồng: {row['Hoa_hồng_formatted']}"
+                hover_texts.append(hover_text)
+            
+            fig2.update_traces(
+                textposition='inside',
+                textinfo='percent+label',
+                hovertemplate='%{customdata}<extra></extra>',
+                customdata=hover_texts
+            )
+            st.plotly_chart(fig2, use_container_width=True)
+
+        with col_b:
+            # Biểu đồ Hoa hồng theo khung giờ
+            hourly_comm = df_filtered.groupby('Giờ')['Tổng hoa hồng đơn hàng(₫)'].sum().reset_index()
+            hourly_comm['Hoa_hồng_formatted'] = hourly_comm['Tổng hoa hồng đơn hàng(₫)'].apply(format_currency)
+            
+            fig3 = px.bar(hourly_comm, x='Giờ', y='Tổng hoa hồng đơn hàng(₫)', title="Hoa hồng theo khung giờ")
+            fig3.update_traces(
+                hovertemplate="<b>Giờ:</b> %{x}h<br><b>Hoa hồng:</b> %{customdata}<extra></extra>",
+                customdata=hourly_comm['Hoa_hồng_formatted']
+            )
+            st.plotly_chart(fig3, use_container_width=True)
+            
+            # Top 10 Danh mục
+            cat_data = df_filtered.groupby('L1 Danh mục toàn cầu').agg(
+                Số_đơn=('ID đơn hàng', 'count'), 
+                Hoa_hồng=('Tổng hoa hồng đơn hàng(₫)', 'sum')
+            ).nlargest(10, 'Hoa_hồng').reset_index()
+            
+            cat_data.columns = ['Danh mục sản phẩm', 'Số_đơn', 'Hoa hồng (₫)']
+            cat_data['Số_đơn_formatted'] = cat_data['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.'))
+            cat_data['Hoa_hồng_formatted'] = cat_data['Hoa hồng (₫)'].apply(format_currency)
+            
+            fig4 = px.bar(cat_data, x='Hoa hồng (₫)', y='Danh mục sản phẩm', orientation='h', title="Top 10 Danh mục")
+            fig4.update_traces(
+                hovertemplate="<b>Số đơn:</b> %{customdata[0]}<br><b>Hoa hồng:</b> %{customdata[1]}<extra></extra>",
+                customdata=cat_data[['Số_đơn_formatted', 'Hoa_hồng_formatted']]
+            )
+            st.plotly_chart(fig4, use_container_width=True)
 
         st.markdown("---")
         
         # MỤC 4: TOP 20 SUBID
-        st.header("4. Top 20 SubID có nhiều đơn nhất")
+        st.header("4. Top 20 SubID hiệu quả nhất")
         
+        sub_id_cols = ['Sub_id1', 'Sub_id2', 'Sub_id3', 'Sub_id4', 'Sub_id5']
         sub_list = []
-        for i in range(1, 6):
-            col = f'Sub_id{i}'
+        for col in sub_id_cols:
             if col in df_filtered.columns:
-                temp = df_filtered[[col, 'Tổng hoa hồng đơn hàng(₫)']].copy()
-                temp = temp[temp[col].notna() & (temp[col] != '')]
+                temp = df_filtered[df_filtered[col].notna() & (df_filtered[col] != '')][[col, 'Tổng hoa hồng đơn hàng(₫)']]
                 temp.columns = ['SubID', 'HoaHồng']
                 sub_list.append(temp)
         
@@ -316,7 +385,7 @@ if uploaded_file is not None:
 
         st.markdown("---")
         
-        # MỤC 5: TOP 10 SẢN PHẨM NHIỀU ĐƠN NHẤT - CHÈN LINK VÀO TÊN
+        # MỤC 5: TOP 10 SẢN PHẨM NHIỀU ĐƠN NHẤT
         st.header("5. Top 10 sản phẩm nhiều đơn nhất")
         
         # Group by both Tên Item, Shop id và Item id để lấy link
@@ -337,8 +406,7 @@ if uploaded_file is not None:
         
         top_products = pd.DataFrame({
             'STT': range(1, len(product_stats) + 1),
-            'Tên sản phẩm': product_stats['Tên Item'],
-            'Link': product_stats['Link'],
+            'Tên sản phẩm': product_stats['Link'],  # Đưa link vào cột Tên sản phẩm
             'Tổng GMV': product_stats['GMV'].apply(format_currency),
             'Số đơn': product_stats['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.')),
             'Hoa hồng': product_stats['Hoa_hồng'].apply(format_currency),
@@ -351,8 +419,7 @@ if uploaded_file is not None:
             hide_index=True,
             column_config={
                 "STT": st.column_config.NumberColumn("STT", width="small"),
-                "Tên sản phẩm": st.column_config.TextColumn("Tên sản phẩm", width="large"),
-                "Link": st.column_config.LinkColumn("Link", display_text="🔗 Xem sản phẩm", width="small"),
+                "Tên sản phẩm": st.column_config.LinkColumn("Tên sản phẩm", width="large"),  # Đổi thành LinkColumn
                 "Tổng GMV": st.column_config.TextColumn("Tổng GMV", width="medium"),
                 "Số đơn": st.column_config.TextColumn("Số đơn", width="small"),
                 "Hoa hồng": st.column_config.TextColumn("Hoa hồng", width="medium"),
@@ -363,7 +430,7 @@ if uploaded_file is not None:
 
         st.markdown("---")
         
-        # MỤC 6: TOP 10 SHOP CÓ NHIỀU ĐƠN NHẤT - CHÈN LINK VÀO TÊN
+        # MỤC 6: TOP 10 SHOP CÓ NHIỀU ĐƠN NHẤT
         st.header("6. Top 10 shop có nhiều đơn nhất")
         
         # Group by both Tên Shop và Shop id để lấy link
@@ -381,8 +448,7 @@ if uploaded_file is not None:
         
         top_shops = pd.DataFrame({
             'STT': range(1, len(shop_stats) + 1),
-            'Tên shop': shop_stats['Tên Shop'],
-            'Link': shop_stats['Link'],
+            'Tên shop': shop_stats['Link'],  # Đưa link vào cột Tên shop
             'Tổng GMV': shop_stats['GMV'].apply(format_currency),
             'Số đơn': shop_stats['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.')),
             'Hoa hồng': shop_stats['Hoa_hồng'].apply(format_currency),
@@ -395,8 +461,7 @@ if uploaded_file is not None:
             hide_index=True,
             column_config={
                 "STT": st.column_config.NumberColumn("STT", width="small"),
-                "Tên shop": st.column_config.TextColumn("Tên shop", width="large"),
-                "Link": st.column_config.LinkColumn("Link", display_text="🔗 Xem shop", width="small"),
+                "Tên shop": st.column_config.LinkColumn("Tên shop", width="large"),  # Đổi thành LinkColumn
                 "Tổng GMV": st.column_config.TextColumn("Tổng GMV", width="medium"),
                 "Số đơn": st.column_config.TextColumn("Số đơn", width="small"),
                 "Hoa hồng": st.column_config.TextColumn("Hoa hồng", width="medium"),
