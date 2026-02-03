@@ -36,6 +36,11 @@ st.markdown("""
         display: none !important;
     }
     
+    /* Ẩn label "Choose a date range" của date_input */
+    [data-testid="stDateInput"] label {
+        display: none !important;
+    }
+    
     /* Style cho bảng dataframe */
     .stDataFrame {
         font-size: 14px;
