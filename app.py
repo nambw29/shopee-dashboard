@@ -15,7 +15,7 @@ except:
     except:
         pass  # Sử dụng locale mặc định nếu không set được
 
-# --- CSS và JavaScript để Việt hóa và tùy chỉnh ---
+# --- CSS để Việt hóa và tùy chỉnh vùng tải tệp ---
 st.markdown("""
     <style>
     [data-testid="stFileUploaderDropzoneInstructions"] > div > span {
@@ -51,50 +51,6 @@ st.markdown("""
         padding: 10px 8px !important;
     }
     </style>
-    
-    <script>
-    // Xóa text "Choose a date range" khi popup xuất hiện
-    function hideChooseDateRange() {
-        const observer = new MutationObserver(function(mutations) {
-            mutations.forEach(function(mutation) {
-                // Tìm tất cả h4 elements
-                const h4Elements = document.querySelectorAll('h4');
-                h4Elements.forEach(function(h4) {
-                    if (h4.textContent.includes('Choose a date range')) {
-                        h4.style.display = 'none';
-                        h4.style.visibility = 'hidden';
-                        h4.style.height = '0';
-                        h4.style.margin = '0';
-                        h4.style.padding = '0';
-                    }
-                });
-                
-                // Tìm trong popover
-                const popovers = document.querySelectorAll('[data-baseweb="popover"]');
-                popovers.forEach(function(popover) {
-                    const h4s = popover.querySelectorAll('h4');
-                    h4s.forEach(function(h4) {
-                        if (h4.textContent.includes('Choose a date range')) {
-                            h4.remove();
-                        }
-                    });
-                });
-            });
-        });
-        
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
-    }
-    
-    // Chạy khi trang load
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', hideChooseDateRange);
-    } else {
-        hideChooseDateRange();
-    }
-    </script>
     """, unsafe_allow_html=True)
 
 # --- HÀM FORMAT SỐ TIỀN ---
@@ -198,69 +154,12 @@ with col_date:
     if uploaded_file is not None:
         df_temp = load_data(uploaded_file)
         if df_temp is not None:
-            # Lựa chọn khoảng thời gian
-            from datetime import datetime, timedelta
-            
-            min_date = df_temp['Ngày'].min()
-            max_date = df_temp['Ngày'].max()
-            today = datetime.now().date()
-            
-            # Dropdown cho các lựa chọn thời gian
-            time_option = st.selectbox(
-                "",
-                ["Ngày cập nhật lần cuối", "7 ngày qua", "15 ngày qua", "30 ngày qua", 
-                 "Tháng này", "Tháng trước", "Từ trước đến nay"],
+            date_range = st.date_input(
+                "Thời gian:", 
+                [df_temp['Ngày'].min(), df_temp['Ngày'].max()], 
+                format="DD/MM/YYYY",
                 label_visibility="collapsed"
             )
-            
-            # Tính toán khoảng thời gian dựa trên lựa chọn
-            if time_option == "Ngày cập nhật lần cuối":
-                default_start = max_date
-                default_end = max_date
-            elif time_option == "7 ngày qua":
-                default_start = max(min_date, max_date - timedelta(days=6))
-                default_end = max_date
-            elif time_option == "15 ngày qua":
-                default_start = max(min_date, max_date - timedelta(days=14))
-                default_end = max_date
-            elif time_option == "30 ngày qua":
-                default_start = max(min_date, max_date - timedelta(days=29))
-                default_end = max_date
-            elif time_option == "Tháng này":
-                first_day_this_month = datetime(today.year, today.month, 1).date()
-                default_start = max(min_date, first_day_this_month)
-                default_end = max_date
-            elif time_option == "Tháng trước":
-                first_day_this_month = datetime(today.year, today.month, 1).date()
-                last_day_last_month = first_day_this_month - timedelta(days=1)
-                first_day_last_month = datetime(last_day_last_month.year, last_day_last_month.month, 1).date()
-                default_start = max(min_date, first_day_last_month)
-                default_end = min(max_date, last_day_last_month)
-            else:  # "Từ trước đến nay"
-                default_start = min_date
-                default_end = max_date
-            
-            # 2 ô chọn ngày riêng biệt (KHÔNG có popup "Choose a date range")
-            col_start, col_end = st.columns(2)
-            with col_start:
-                start_date = st.date_input(
-                    "Từ ngày:", 
-                    default_start, 
-                    format="DD/MM/YYYY",
-                    min_value=min_date,
-                    max_value=max_date
-                )
-            with col_end:
-                end_date = st.date_input(
-                    "Đến ngày:", 
-                    default_end, 
-                    format="DD/MM/YYYY",
-                    min_value=min_date,
-                    max_value=max_date
-                )
-            
-            # Tạo tuple để giữ format giống như trước
-            date_range = (start_date, end_date)
     else:
         st.info("Vui lòng tải lên file CSV")
         date_range = None
