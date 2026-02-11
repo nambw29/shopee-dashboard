@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import locale
+from datetime import timedelta
 
 # 1. Cấu hình trang
 st.set_page_config(page_title="Shopee Affiliate Analytics Dashboard by BLACKWHITE29", layout="wide", page_icon="🧧")
@@ -401,37 +402,20 @@ if uploaded_file is not None:
         product_stats['Tỉ lệ hoa hồng'] = (product_stats['Hoa_hồng'] / product_stats['GMV'] * 100).round(2)
         product_stats = product_stats.nlargest(10, 'Số_đơn').reset_index(drop=True)
         
-        # Tạo link sản phẩm
-        product_stats['Link'] = product_stats.apply(
-            lambda row: f"https://shopee.vn/product/{row['Shop id']}/{row['Item id']}", 
-            axis=1
-        )
-        
         top_products = pd.DataFrame({
             'STT': range(1, len(product_stats) + 1),
-            'Tên sản phẩm': product_stats['Tên Item'],
-            'Link sản phẩm': product_stats['Link'],
+            'Tên sản phẩm': product_stats.apply(
+                lambda row: f"[{str(row['Tên Item']).replace('[', '\\[').replace(']', '\\]')}]"
+                f"(https://shopee.vn/product/{row['Shop id']}/{row['Item id']})",
+                axis=1
+            ),
             'Tổng GMV': product_stats['GMV'].apply(format_currency),
             'Số đơn': product_stats['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.')),
             'Hoa hồng': product_stats['Hoa_hồng'].apply(format_currency),
             'Tỉ lệ hoa hồng': product_stats['Tỉ lệ hoa hồng'].apply(lambda x: f"{x:.2f}%")
         })
-        
-        st.dataframe(
-            top_products,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "STT": st.column_config.NumberColumn("STT", width="small"),
-                "Tên sản phẩm": st.column_config.TextColumn("Tên sản phẩm", width="large"),
-                "Link sản phẩm": st.column_config.LinkColumn("Link sản phẩm", width="medium"),
-                "Tổng GMV": st.column_config.TextColumn("Tổng GMV", width="medium"),
-                "Số đơn": st.column_config.TextColumn("Số đơn", width="small"),
-                "Hoa hồng": st.column_config.TextColumn("Hoa hồng", width="medium"),
-                "Tỉ lệ hoa hồng": st.column_config.TextColumn("Tỉ lệ hoa hồng", width="small"),
-            },
-            height=400
-        )
+
+        st.table(top_products)
 
         st.markdown("---")
         
@@ -448,34 +432,20 @@ if uploaded_file is not None:
         shop_stats['Tỉ lệ hoa hồng'] = (shop_stats['Hoa_hồng'] / shop_stats['GMV'] * 100).round(2)
         shop_stats = shop_stats.nlargest(10, 'Số_đơn').reset_index(drop=True)
         
-        # Tạo link shop
-        shop_stats['Link'] = shop_stats['Shop id'].apply(lambda x: f"https://shopee.vn/shop/{x}")
-        
         top_shops = pd.DataFrame({
             'STT': range(1, len(shop_stats) + 1),
-            'Tên shop': shop_stats['Tên Shop'],
-            'Link shop': shop_stats['Link'],
+            'Tên shop': shop_stats.apply(
+                lambda row: f"[{str(row['Tên Shop']).replace('[', '\\[').replace(']', '\\]')}]"
+                f"(https://shopee.vn/shop/{row['Shop id']})",
+                axis=1
+            ),
             'Tổng GMV': shop_stats['GMV'].apply(format_currency),
             'Số đơn': shop_stats['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.')),
             'Hoa hồng': shop_stats['Hoa_hồng'].apply(format_currency),
             'Tỉ lệ hoa hồng': shop_stats['Tỉ lệ hoa hồng'].apply(lambda x: f"{x:.2f}%")
         })
-        
-        st.dataframe(
-            top_shops,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "STT": st.column_config.NumberColumn("STT", width="small"),
-                "Tên shop": st.column_config.TextColumn("Tên shop", width="large"),
-                "Link shop": st.column_config.LinkColumn("Link shop", width="medium"),
-                "Tổng GMV": st.column_config.TextColumn("Tổng GMV", width="medium"),
-                "Số đơn": st.column_config.TextColumn("Số đơn", width="small"),
-                "Hoa hồng": st.column_config.TextColumn("Hoa hồng", width="medium"),
-                "Tỉ lệ hoa hồng": st.column_config.TextColumn("Tỉ lệ hoa hồng", width="small"),
-            },
-            height=400
-        )
+
+        st.table(top_shops)
 
         st.markdown("---")
         
