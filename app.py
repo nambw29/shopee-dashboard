@@ -524,4 +524,4 @@ if uploaded_file is not None:
             if len(df_cancelled) > 0:
                 st.dataframe(df_cancelled, use_container_width=True, hide_index=True, height=500)
             else:
-                st.info("Không có đơn hàng đã hủy")
+                st.info("Không có đơn hàng đã hủy!")
