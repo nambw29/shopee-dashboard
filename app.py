@@ -423,7 +423,7 @@ if uploaded_file is not None:
             'Tỉ lệ hoa hồng': product_stats['Tỉ lệ hoa hồng'].apply(lambda x: f"{x:.2f}%")
         })
 
-        st.table(top_products)
+        st.table(top_products.set_index('STT'))
 
         st.markdown("---")
         
@@ -453,7 +453,7 @@ if uploaded_file is not None:
             'Tỉ lệ hoa hồng': shop_stats['Tỉ lệ hoa hồng'].apply(lambda x: f"{x:.2f}%")
         })
 
-        st.table(top_shops)
+        st.table(top_shops.set_index('STT'))
 
         st.markdown("---")
         
