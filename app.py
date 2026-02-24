@@ -195,24 +195,21 @@ if uploaded_file is not None:
         comm_social = comm_by_channel[comm_by_channel['Phân loại nguồn'] == 'Social']['Tổng hoa hồng đơn hàng(₫)'].sum()
         comm_others = comm_by_channel[comm_by_channel['Phân loại nguồn'] == 'Others']['Tổng hoa hồng đơn hàng(₫)'].sum()
 
-        # HÀNG 1: 4 cột
-        col1, col2, col3, col4 = st.columns(4)
+        # HÀNG 1: 5 cột
+        col1, col2, col3, col4, col5 = st.columns(5)
         col1.metric("💰 Tổng Doanh Thu", format_currency(total_gmv))
         col2.metric("💵 Tổng Hoa Hồng", format_currency(total_comm))
         col3.metric("📦 Tổng Đơn Hàng", f"{total_orders:,}".replace(',', '.'))
-        col4.metric("💎 Hoa Hồng Shopee", format_currency(hh_shopee))
+        col4.metric("💎 HH Shopee", format_currency(hh_shopee))
+        col5.metric("⭐ HH Xtra", format_currency(hh_xtra))
         
-        # HÀNG 2: 4 cột
-        col5, col6, col7, col8 = st.columns(4)
-        col5.metric("⭐ Hoa Hồng Xtra", format_currency(hh_xtra))
-        col6.metric("📊 Tỷ Lệ Hoa Hồng", f"{commission_rate:.2f}%")
-        col7.metric("🛒 Số Lượng Đã Bán", f"{total_quantity_sold:,}".replace(',', '.'))
-        col8.metric("📈 Hoa Hồng TB/Đơn", format_currency(avg_commission_per_order))
-        
-        # HÀNG 3: 2 cột (Social và Others)
-        col9, col10 = st.columns(2)
-        col9.metric("👥 Hoa Hồng Social", format_currency(comm_social))
-        col10.metric("📋 Hoa Hồng Others", format_currency(comm_others))
+        # HÀNG 2: 5 cột
+        col6, col7, col8, col9, col10 = st.columns(5)
+        col6.metric("📊 Tỷ Lệ HH", f"{commission_rate:.2f}%")
+        col7.metric("🛒 Số Lượng Bán", f"{total_quantity_sold:,}".replace(',', '.'))
+        col8.metric("📈 HH TB/Đơn", format_currency(avg_commission_per_order))
+        col9.metric("👥 HH Social", format_currency(comm_social))
+        col10.metric("📋 HH Others", format_currency(comm_others))
 
         st.markdown("---")
 
@@ -330,26 +327,32 @@ if uploaded_file is not None:
         st.header("4. Top 20 SubID hiệu quả nhất")
         
         sub_id_cols = ['Sub_id1', 'Sub_id2', 'Sub_id3', 'Sub_id4', 'Sub_id5']
-        sub_list = []
-        for col in sub_id_cols:
-            if col in df_filtered.columns:
-                temp = df_filtered[df_filtered[col].notna() & (df_filtered[col] != '')][[col, 'Tổng hoa hồng đơn hàng(₫)']]
-                temp.columns = ['SubID', 'HoaHồng']
-                sub_list.append(temp)
         
-        if sub_list:
-            all_subs = pd.concat(sub_list).groupby('SubID').agg(
-                Số_đơn=('SubID','count'), 
-                Hoa_hồng=('HoaHồng','sum')
+        # Tạo cột SubID kết hợp từ tất cả 5 cột
+        df_filtered_sub = df_filtered.copy()
+        df_filtered_sub['SubID_Merged'] = df_filtered_sub[sub_id_cols].fillna('').apply(
+            lambda row: '-'.join([str(x).strip() for x in row if str(x).strip() != '']), axis=1
+        )
+        
+        # Lọc những dòng có SubID
+        df_filtered_sub = df_filtered_sub[df_filtered_sub['SubID_Merged'] != '']
+        
+        if len(df_filtered_sub) > 0:
+            # Nhóm theo SubID kết hợp và tính toán
+            sub_stats = df_filtered_sub.groupby('SubID_Merged').agg(
+                Số_đơn=('ID đơn hàng', 'count'),
+                Doanh_thu=('Giá trị đơn hàng (₫)', 'sum'),
+                Hoa_hồng=('Tổng hoa hồng đơn hàng(₫)', 'sum')
             ).reset_index().sort_values('Số_đơn', ascending=False).head(20)
             
             # Tạo bảng hiển thị đẹp
             display_df = pd.DataFrame({
-                'Xếp Hạng': range(1, len(all_subs) + 1),
-                'SubID': all_subs['SubID'].values,
-                'Số Đơn': all_subs['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.')).values,
-                'Tổng Hoa Hồng': all_subs['Hoa_hồng'].apply(format_currency).values,
-                'HH Trung Bình/Đơn': all_subs.apply(lambda row: format_currency(row['Hoa_hồng']/row['Số_đơn'] if row['Số_đơn'] > 0 else 0), axis=1).values
+                'Xếp Hạng': range(1, len(sub_stats) + 1),
+                'SubID': sub_stats['SubID_Merged'].values,
+                'Số Đơn': sub_stats['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.')).values,
+                'Doanh Thu': sub_stats['Doanh_thu'].apply(format_currency).values,
+                'Tổng Hoa Hồng': sub_stats['Hoa_hồng'].apply(format_currency).values,
+                'HH Trung Bình/Đơn': sub_stats.apply(lambda row: format_currency(row['Hoa_hồng']/row['Số_đơn'] if row['Số_đơn'] > 0 else 0), axis=1).values
             })
             
             # Hiển thị bảng với style đẹp
@@ -365,13 +368,18 @@ if uploaded_file is not None:
                     ),
                     "SubID": st.column_config.TextColumn(
                         "SubID",
-                        help="Mã SubID",
-                        width="medium",
+                        help="Dãy SubID kết hợp (Sub_id1-Sub_id2-Sub_id3-Sub_id4-Sub_id5)",
+                        width="large",
                     ),
                     "Số Đơn": st.column_config.TextColumn(
                         "Số Đơn",
                         help="Tổng số đơn hàng",
                         width="small",
+                    ),
+                    "Doanh Thu": st.column_config.TextColumn(
+                        "Doanh Thu",
+                        help="Tổng doanh thu",
+                        width="medium",
                     ),
                     "Tổng Hoa Hồng": st.column_config.TextColumn(
                         "Tổng Hoa Hồng",
