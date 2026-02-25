@@ -197,16 +197,16 @@ if uploaded_file is not None:
 
         # HÀNG 1: 5 cột
         col1, col2, col3, col4, col5 = st.columns(5)
-        col1.metric("💰 Tổng Doanh Thu", format_currency(total_gmv))
-        col2.metric("💵 Tổng Hoa Hồng", format_currency(total_comm))
-        col3.metric("📦 Tổng Đơn Hàng", f"{total_orders:,}".replace(',', '.'))
+        col1.metric("💰 Tổng doanh thu", format_currency(total_gmv))
+        col2.metric("💵 Tổng hoa hồng", format_currency(total_comm))
+        col3.metric("📦 Tổng đơn hàng", f"{total_orders:,}".replace(',', '.'))
         col4.metric("💎 Hoa hồng Shopee", format_currency(hh_shopee))
         col5.metric("⭐ Hoa hồng Xtra", format_currency(hh_xtra))
         
         # HÀNG 2: 5 cột
         col6, col7, col8, col9, col10 = st.columns(5)
-        col6.metric("📊 Tỷ Lệ Hoa hồng", f"{commission_rate:.2f}%")
-        col7.metric("🛒 Số Lượng Bán", f"{total_quantity_sold:,}".replace(',', '.'))
+        col6.metric("📊 Tỷ lệ hoa hồng", f"{commission_rate:.2f}%")
+        col7.metric("🛒 Số lượng bán", f"{total_quantity_sold:,}".replace(',', '.'))
         col8.metric("📈 Hoa hồng TB/Đơn", format_currency(avg_commission_per_order))
         col9.metric("👥 Hoa hồng Social", format_currency(comm_social))
         col10.metric("📋 Hoa hồng Others", format_currency(comm_others))
