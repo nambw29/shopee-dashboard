@@ -230,14 +230,15 @@ if uploaded_file is not None:
         orders_zero = df_filtered[df_filtered['Giá trị đơn hàng (₫)'] == 0]['ID đơn hàng'].nunique()
         orders_cancelled = df_filtered[df_filtered['Trạng thái đặt hàng'].str.contains('Hủy', case=False, na=False)]['ID đơn hàng'].nunique()
         
-        # 1 HÀNG 6 CỘT
-        c1, c2, c3, c4, c5, c6 = st.columns(6)
-        c1.metric("👥 Đơn Social", f"{orders_social:,}".replace(',', '.'))
-        c2.metric("📋 Đơn Others", f"{orders_others:,}".replace(',', '.'))
-        c3.metric("🎬 Đơn Video", f"{orders_video:,}".replace(',', '.'))
-        c4.metric("📹 Đơn Live", f"{orders_live:,}".replace(',', '.'))
-        c5.metric("🆓 Đơn 0 Đồng", f"{orders_zero:,}".replace(',', '.'))
-        c6.metric("❌ Đơn Hủy", f"{orders_cancelled:,}".replace(',', '.'))
+        # 1 HÀNG 7 CỘT
+        c0, c1, c2, c3, c4, c5, c6 = st.columns(7)
+        c0.metric("📦 Tổng đơn", f"{total_orders:,}".replace(',', '.'))
+        c1.metric("👥 Đơn social", f"{orders_social:,}".replace(',', '.'))
+        c2.metric("📋 Đơn others", f"{orders_others:,}".replace(',', '.'))
+        c3.metric("🎬 Đơn video", f"{orders_video:,}".replace(',', '.'))
+        c4.metric("📹 Đơn live", f"{orders_live:,}".replace(',', '.'))
+        c5.metric("🆓 Đơn 0 đồng", f"{orders_zero:,}".replace(',', '.'))
+        c6.metric("❌ Đơn hủy", f"{orders_cancelled:,}".replace(',', '.'))
 
         st.markdown("---")
 
