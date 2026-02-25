@@ -347,7 +347,7 @@ if uploaded_file is not None:
             
             # Tạo bảng hiển thị đẹp
             display_df = pd.DataFrame({
-                'Xếp Hạng': range(1, len(sub_stats) + 1),
+                'STT': range(1, len(sub_stats) + 1),
                 'SubID': sub_stats['SubID_Merged'].values,
                 'Số Đơn': sub_stats['Số_đơn'].apply(lambda x: f"{x:,}".replace(',', '.')).values,
                 'Doanh Thu': sub_stats['Doanh_thu'].apply(format_currency).values,
@@ -361,9 +361,9 @@ if uploaded_file is not None:
                 use_container_width=True,
                 hide_index=True,
                 column_config={
-                    "Xếp Hạng": st.column_config.NumberColumn(
-                        "Xếp Hạng",
-                        help="Xếp hạng theo số đơn",
+                    "STT": st.column_config.NumberColumn(
+                        "STT",
+                        help="Số thứ tự",
                         width="small",
                     ),
                     "SubID": st.column_config.TextColumn(
